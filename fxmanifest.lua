@@ -46,6 +46,8 @@ client_scripts {
     -- Analytics & Rewards
     'client/cl_leaderboard.lua',
     'client/cl_rewards.lua',
+    'client/cl_vehicle_achievements.lua',
+    'client/cl_npc_surplus.lua',
     
     -- Administration
     'client/cl_admin.lua'
@@ -70,6 +72,9 @@ server_scripts {
     'server/sv_stock_alerts.lua',
     'server/sv_performance_tracking.lua',
     'server/sv_leaderboard.lua',
+    'server/sv_achievements.lua',
+    'server/sv_npc_surplus.lua',
+
     
     -- Reward Systems
     'server/sv_rewards.lua',

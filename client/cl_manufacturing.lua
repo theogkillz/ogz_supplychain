@@ -86,47 +86,91 @@ end
 -- MANUFACTURING FACILITY SETUP
 -- ============================================
 
--- Setup manufacturing facilities
+-- Enhanced facility setup with debugging
 Citizen.CreateThread(function()
+    print("[MANUFACTURING] Starting facility setup...")
+    
     if not Config.ManufacturingFacilities then
         print("[ERROR] Config.ManufacturingFacilities not defined")
         return
     end
     
+    print("[MANUFACTURING] Found " .. #Config.ManufacturingFacilities .. " facilities to set up")
+    
     for facilityId, facility in pairs(Config.ManufacturingFacilities) do
-        -- Create target zone with job validation
-        exports.ox_target:addBoxZone({
-            coords = facility.position,
-            size = vector3(2.0, 2.0, 2.0),
-            rotation = facility.heading,
-            debug = false,
-            options = {
-                {
-                    name = "manufacturing_facility_" .. facilityId,
-                    icon = "fas fa-industry",
-                    label = "Access " .. facility.name,
-                    groups = {"hurst"}, -- Only hurst job group
-                    onSelect = function()
-                        TriggerEvent("manufacturing:openFacilityMenu", facilityId)
-                    end
-                }
-            }
-        })
+        print("[MANUFACTURING] Setting up facility " .. facilityId .. ": " .. facility.name)
         
-        -- Spawn facility ped
-        local pedModel = GetHashKey(facility.ped.model)
-        RequestModel(pedModel)
-        while not HasModelLoaded(pedModel) do
-            Citizen.Wait(100)
+        -- Validate facility data
+        if not facility.position then
+            print("[ERROR] Facility " .. facilityId .. " missing position")
+            goto continue
         end
         
-        local ped = CreatePed(4, pedModel, facility.position.x, facility.position.y, facility.position.z - 1.0, 
-            facility.ped.heading, false, true)
+        -- Create target zone with enhanced debugging
+        local targetSuccess = pcall(function()
+            exports.ox_target:addBoxZone({
+                coords = facility.position,
+                size = vector3(3.0, 3.0, 3.0), -- Increased size for better interaction
+                rotation = facility.heading,
+                debug = true, -- Enable debug mode temporarily
+                options = {
+                    {
+                        name = "manufacturing_facility_" .. facilityId,
+                        icon = "fas fa-industry",
+                        label = "Access " .. facility.name,
+                        groups = {"hurst"}, -- Job validation
+                        onSelect = function()
+                            print("[MANUFACTURING] Facility " .. facilityId .. " accessed")
+                            TriggerEvent("manufacturing:openFacilityMenu", facilityId)
+                        end
+                    }
+                }
+            })
+        end)
+        
+        if not targetSuccess then
+            print("[ERROR] Failed to create target zone for facility " .. facilityId)
+            goto continue
+        else
+            print("[SUCCESS] Target zone created for facility " .. facilityId)
+        end
+        
+        -- Spawn facility ped with validation
+        local pedModel = GetHashKey(facility.ped.model)
+        print("[MANUFACTURING] Requesting ped model: " .. facility.ped.model .. " (hash: " .. pedModel .. ")")
+        
+        RequestModel(pedModel)
+        local attempts = 0
+        while not HasModelLoaded(pedModel) and attempts < 50 do
+            Citizen.Wait(100)
+            attempts = attempts + 1
+        end
+        
+        if not HasModelLoaded(pedModel) then
+            print("[ERROR] Failed to load ped model for facility " .. facilityId .. ": " .. facility.ped.model)
+            goto continue
+        end
+        
+        local ped = CreatePed(4, pedModel, 
+            facility.position.x, 
+            facility.position.y, 
+            facility.position.z - 1.0, 
+            facility.ped.heading, 
+            false, true)
+        
+        if not DoesEntityExist(ped) then
+            print("[ERROR] Failed to create ped for facility " .. facilityId)
+            goto continue
+        end
+        
+        -- Configure ped
         SetEntityAsMissionEntity(ped, true, true)
         SetBlockingOfNonTemporaryEvents(ped, true)
         FreezeEntityPosition(ped, true)
         SetEntityInvincible(ped, true)
         SetModelAsNoLongerNeeded(pedModel)
+        
+        print("[SUCCESS] Ped created for facility " .. facilityId)
         
         -- Create facility blip
         local blip = AddBlipForCoord(facility.position.x, facility.position.y, facility.position.z)
@@ -139,8 +183,24 @@ Citizen.CreateThread(function()
         AddTextComponentString(facility.blip.label)
         EndTextCommandSetBlipName(blip)
         
-        Citizen.Wait(0)
+        print("[SUCCESS] Blip created for facility " .. facilityId)
+        
+        ::continue::
+        Citizen.Wait(100) -- Small delay between facility setups
     end
+    
+    print("[MANUFACTURING] Facility setup complete")
+    
+    -- Show summary to player
+    Citizen.Wait(5000)
+    lib.notify({
+        title = '🏭 Manufacturing Facilities',
+        description = 'Manufacturing facilities have been set up. Check your map for blips.',
+        type = 'info',
+        duration = 8000,
+        position = Config.UI.notificationPosition,
+        markdown = Config.UI.enableMarkdown
+    })
 end)
 
 -- ============================================
@@ -835,3 +895,60 @@ AddEventHandler("manufacturing:openRecipeGuide", function(facilityId)
 end)
 
 print("[MANUFACTURING] Client interface initialized")
+
+-- Debug command to check facility status
+RegisterCommand('checkfacilities', function()
+    print("[DEBUG] Checking manufacturing facilities...")
+    
+    if not Config.ManufacturingFacilities then
+        print("No facilities configured")
+        return
+    end
+    
+    for facilityId, facility in pairs(Config.ManufacturingFacilities) do
+        local playerPos = GetEntityCoords(PlayerPedId())
+        local distance = #(playerPos - facility.position)
+        
+        print(string.format("Facility %d: %s - Distance: %.2f", facilityId, facility.name, distance))
+        
+        lib.notify({
+            title = 'Facility ' .. facilityId,
+            description = facility.name .. ' - Distance: ' .. math.floor(distance) .. 'm',
+            type = 'info',
+            duration = 5000,
+            position = Config.UI.notificationPosition,
+            markdown = Config.UI.enableMarkdown
+        })
+    end
+end)
+
+-- Debug command to teleport to facilities
+RegisterCommand('tpfacility', function(source, args)
+    local facilityId = tonumber(args[1])
+    
+    if not facilityId or not Config.ManufacturingFacilities[facilityId] then
+        lib.notify({
+            title = 'Invalid Facility',
+            description = 'Use: /tpfacility [1-5]',
+            type = 'error',
+            duration = 5000,
+            position = Config.UI.notificationPosition,
+            markdown = Config.UI.enableMarkdown
+        })
+        return
+    end
+    
+    local facility = Config.ManufacturingFacilities[facilityId]
+    local playerPed = PlayerPedId()
+    
+    SetEntityCoords(playerPed, facility.position.x, facility.position.y, facility.position.z + 1.0, false, false, false, true)
+    
+    lib.notify({
+        title = 'Teleported',
+        description = 'Teleported to ' .. facility.name,
+        type = 'success',
+        duration = 5000,
+        position = Config.UI.notificationPosition,
+        markdown = Config.UI.enableMarkdown
+    })
+end)

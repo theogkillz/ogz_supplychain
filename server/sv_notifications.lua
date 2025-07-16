@@ -406,6 +406,65 @@ AddEventHandler('notifications:updatePreferences', function(preferences)
     })
 end)
 
+-- Achievement unlock notifications
+local function sendAchievementNotification(citizenid, newTier, oldTier)
+    local src = QBCore.Functions.GetPlayerByCitizenId(citizenid)
+    if not src then return end
+    
+    local tierInfo = Config.AchievementVehicles.performanceTiers[newTier]
+    
+    -- Discord webhook notification
+    if Config.Webhooks.achievements then
+        local embed = {
+            {
+                title = "🏆 Achievement Unlocked!",
+                description = string.format("Player achieved **%s** tier!", tierInfo.name),
+                color = 65280, -- Green
+                fields = {
+                    {name = "Player", value = GetPlayerName(src), inline = true},
+                    {name = "Previous Tier", value = oldTier, inline = true},
+                    {name = "New Tier", value = newTier, inline = true},
+                    {name = "Vehicle Benefits", value = tierInfo.description, inline = false}
+                },
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
+        }
+        
+        PerformHttpRequest(Config.Webhooks.achievements, function() end, 'POST', 
+            json.encode({username = "Achievement System", embeds = embed}), 
+            {['Content-Type'] = 'application/json'})
+    end
+end
+
+-- NPC surplus notifications
+local function sendSurplusAlert(surplusLevel, ingredientCount)
+    if Config.Webhooks.npc_system then
+        local levelInfo = getSurplusLevelInfo(surplusLevel)
+        
+        local embed = {
+            {
+                title = levelInfo.icon .. " Warehouse Surplus Alert",
+                description = string.format("**%s surplus** detected - NPC deliveries now available", levelInfo.name),
+                color = surplusLevel == "critical_surplus" and 16711680 or 16776960, -- Red or Yellow
+                fields = {
+                    {name = "Surplus Level", value = levelInfo.name, inline = true},
+                    {name = "Affected Items", value = tostring(ingredientCount), inline = true},
+                    {name = "Action Required", value = "Warehouse workers can now dispatch NPC drivers", inline = false}
+                },
+                timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+            }
+        }
+        
+        PerformHttpRequest(Config.Webhooks.npc_system, function() end, 'POST', 
+            json.encode({username = "NPC Surplus System", embeds = embed}), 
+            {['Content-Type'] = 'application/json'})
+    end
+end
+
+-- Export notification functions
+exports('sendAchievementNotification', sendAchievementNotification)
+exports('sendSurplusAlert', sendSurplusAlert)
+
 -- Initialize notifications system
 AddEventHandler('onResourceStart', function(resourceName)
     if resourceName == GetCurrentResourceName() then

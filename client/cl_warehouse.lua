@@ -156,6 +156,14 @@ AddEventHandler("warehouse:openProcessingMenu", function()
                 TriggerServerEvent("stockalerts:getSuggestions")
             end
         },
+                {
+            title = "🤖 NPC Delivery Management",
+            description = "Manage NPC drivers for surplus inventory",
+            icon = "fas fa-robot",
+            onSelect = function()
+                TriggerEvent("npc:openManagementMenu")
+            end
+        },
         {
             title = "🏆 Driver Leaderboards",
             description = "View top performing drivers and rankings",
@@ -179,7 +187,15 @@ AddEventHandler("warehouse:openProcessingMenu", function()
             onSelect = function()
                 TriggerServerEvent("rewards:getPlayerStatus")
             end
-        }
+        },
+        {
+            title = "🏆 My Achievement Status",
+            description = "View vehicle performance tier and progress",
+            icon = "fas fa-medal",
+            onSelect = function()
+                TriggerServerEvent("achievements:getPlayerTier")
+            end
+        },
     }
     lib.registerContext({
         id = "main_menu",

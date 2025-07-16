@@ -18,3 +18,47 @@ AddEventHandler('onResourceStart', function(resourceName)
         end)
     end
 end)
+
+-- Universal validation helper
+local function validatePlayerAccess(source, feature)
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then
+        return false, "Player not found"
+    end
+    
+    local playerJob = Player.PlayerData.job.name
+    local currentJob = playerJob or "unemployed"
+    
+    -- Use config validation functions
+    local hasAccess = false
+    if feature == "achievement" then
+        hasAccess = Config.JobValidation.validateAchievementAccess(playerJob)
+    elseif feature == "npc" then
+        hasAccess = Config.JobValidation.validateNPCAccess(playerJob)
+    elseif feature == "vehicle" then
+        hasAccess = Config.JobValidation.validateVehicleOwnership(playerJob)
+    elseif feature == "manufacturing" then
+        hasAccess = Config.JobValidation.validateManufacturingAccess(playerJob)
+    elseif feature == "warehouse" then
+        hasAccess = Config.JobValidation.validateWarehouseAccess(playerJob)
+    end
+    
+    if not hasAccess then
+        local errorMessage = Config.JobValidation.getAccessDeniedMessage(feature, currentJob)
+        return false, errorMessage
+    end
+    
+    return true, "Access granted"
+end
+
+-- Export validation helper
+exports('validatePlayerAccess', validatePlayerAccess)
+
+-- Universal validation event
+RegisterNetEvent('system:validateAccess')
+AddEventHandler('system:validateAccess', function(feature)
+    local src = source
+    local hasAccess, message = validatePlayerAccess(src, feature)
+    
+    TriggerClientEvent('system:accessValidationResult', src, feature, hasAccess, message)
+end)

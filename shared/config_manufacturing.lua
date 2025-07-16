@@ -52,13 +52,35 @@ Config.Manufacturing = {
     }
 }
 
-Config.Jobs = Config.Jobs or {}
-Config.Jobs.manufacturing = {"hurst"} -- Only hurst job can access manufacturing
+-- ============================================
+-- JOB ACCESS CONFIGURATION
+-- ============================================
 
--- Manufacturing access validation
-Config.Manufacturing = Config.Manufacturing or {}
-Config.Manufacturing.requiredJob = "hurst"
-Config.Manufacturing.accessMessage = "Hurst Industries employees only"
+-- Manufacturing job access - ONLY HURST JOB
+Config.ManufacturingJobs = {
+    authorized = {"hurst"}, -- Only hurst job can access manufacturing
+    
+    -- Job-specific bonuses for hurst employees
+    jobBonuses = {
+        ["hurst"] = {
+            experienceMultiplier = 1.5,
+            speedBonus = 0.10,
+            qualityBonus = 0.05
+        }
+    }
+}
+
+-- Universal job validation function
+function Config.HasManufacturingAccess(playerJob)
+    return playerJob == "hurst"
+end
+
+-- Error messages
+Config.AccessDeniedMessages = {
+    manufacturing = "🚫 Manufacturing access restricted to Hurst Industries employees",
+    warehouse = "🚫 Warehouse access restricted to Hurst Industries employees", 
+    restaurant = "🚫 Restaurant management requires business ownership"
+}
 
 -- ============================================
 -- MANUFACTURING FACILITY LOCATIONS
@@ -109,7 +131,7 @@ Config.ManufacturingFacilities = {
     
     [3] = {
         name = "Meat Processing Facility",
-        position = vector3(2469.23, 4985.67, 51.77), -- Sandy Shores Industrial
+        position = vector3(735.28, -1084.73, 22.17), -- Downtown warehouse district
         heading = 180.0,
         blip = {
             sprite = 568,
@@ -130,7 +152,7 @@ Config.ManufacturingFacilities = {
     
     [4] = {
         name = "Vegetable Processing Center",
-        position = vector3(2488.45, 4959.89, 44.79), -- Sandy Shores Industrial
+        position = vector3(1208.73, -1402.74, 35.22), -- Industrial area
         heading = 270.0,
         blip = {
             sprite = 570,
@@ -151,7 +173,7 @@ Config.ManufacturingFacilities = {
     
     [5] = {
         name = "Artisan Food Laboratory",
-        position = vector3(2501.67, 4963.45, 44.58), -- Sandy Shores Industrial
+        position = vector3(285.28, 2843.73, 44.70), -- Near airfield
         heading = 315.0,
         blip = {
             sprite = 567,
@@ -620,37 +642,6 @@ Config.ManufacturingSkills = {
         [50] = {yieldBonus = 0.10, speedBonus = 0.15}, -- 10% more yield, 15% faster  
         [75] = {yieldBonus = 0.15, speedBonus = 0.20}, -- 15% more yield, 20% faster
         [100] = {yieldBonus = 0.25, speedBonus = 0.30}, -- 25% more yield, 30% faster
-    }
-}
-
--- ============================================
--- MANUFACTURING JOB ACCESS
--- ============================================
-
-Config.ManufacturingJobs = {
-    authorized = {
-        "manufacturer",
-        "warehouse",  -- Warehouse workers can also manufacture
-        "trucker"     -- Truckers can also manufacture during downtime
-    },
-    
-    -- Job-specific bonuses
-    jobBonuses = {
-        ["manufacturer"] = {
-            experienceMultiplier = 1.5,
-            speedBonus = 0.10,
-            qualityBonus = 0.05
-        },
-        ["warehouse"] = {
-            experienceMultiplier = 1.0,
-            speedBonus = 0.05,
-            qualityBonus = 0.00
-        },
-        ["trucker"] = {
-            experienceMultiplier = 0.8,
-            speedBonus = 0.00,
-            qualityBonus = 0.00
-        }
     }
 }
 

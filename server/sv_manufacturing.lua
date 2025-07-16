@@ -385,11 +385,19 @@ local function completeManufacturing(processId)
     else
         -- Successful manufacturing notification
         local qualityText = qualitySuccess and (" (" .. qualityLevel .. " quality)") or " (quality control failed)"
+        local itemLabel = exports.ox_inventory:Items()[finalOutputItem] and 
+            exports.ox_inventory:Items()[finalOutputItem].label or finalOutputItem
+        
+        TriggerClientEvent('manufacturing:processCompleted', process.playerId, {
+            quantity = finalYield,
+            itemLabel = itemLabel,
+            quality = qualityLevel
+        })
         
         TriggerClientEvent('ox_lib:notify', process.playerId, {
             title = '🏭 Manufacturing Complete!',
             description = string.format('Produced **%d %s**%s', 
-                finalYield, exports.ox_inventory:Items()[finalOutputItem]?.label or finalOutputItem, qualityText),
+                finalYield, itemLabel, qualityText),
             type = qualitySuccess and 'success' or 'warning',
             duration = 12000,
             position = Config.UI.notificationPosition,
@@ -421,11 +429,12 @@ local function completeManufacturing(processId)
             local players = QBCore.Functions.GetPlayers()
             for _, playerId in ipairs(players) do
                 local player = QBCore.Functions.GetPlayer(playerId)
-                if player and player.PlayerData.job.name == "warehouse" then
+                if player and player.PlayerData.job.name == "hurst" then
                     TriggerClientEvent('ox_lib:notify', playerId, {
                         title = '📦 New Stock Delivered',
                         description = string.format('%d %s added to warehouse', 
-                            finalYield, exports.ox_inventory:Items()[finalOutputItem]?.label or finalOutputItem),
+                            finalYield, exports.ox_inventory:Items()[finalOutputItem] and
+                            exports.ox_inventory:Items()[finalOutputItem].label or finalOutputItem),
                         type = 'info',
                         duration = 8000,
                         position = Config.UI.notificationPosition,
@@ -473,11 +482,14 @@ AddEventHandler('manufacturing:getRecipes', function(facilityId)
     local src = source
     
     if not hasManufacturingAccess(src) then
+        local Player = QBCore.Functions.GetPlayer(src)
+        local currentJob = Player and Player.PlayerData.job.name or "unemployed"
+        
         TriggerClientEvent('ox_lib:notify', src, {
-            title = 'Access Denied',
-            description = 'You do not have manufacturing access',
+            title = '🚫 Access Denied',
+            description = 'Hurst Industries employees only. Current job: ' .. currentJob,
             type = 'error',
-            duration = 5000,
+            duration = 8000,
             position = Config.UI.notificationPosition,
             markdown = Config.UI.enableMarkdown
         })
@@ -508,7 +520,7 @@ end)
 
 -- Start manufacturing process
 RegisterNetEvent('manufacturing:startProcess')
-AddEventHandler('manufacturing:startProcess', function(recipeId, quantity)
+AddEventHandler('manufacturing:startProcess', function(recipeId, quantity, qualityLevel, facilityId)
     local src = source
     
     -- Validate job access
@@ -520,7 +532,9 @@ AddEventHandler('manufacturing:startProcess', function(recipeId, quantity)
             title = '🚫 Access Denied',
             description = 'Hurst Industries employees only. Current job: ' .. currentJob,
             type = 'error',
-            duration = 8000
+            duration = 8000,
+            position = Config.UI.notificationPosition,
+            markdown = Config.UI.enableMarkdown
         })
         return
     end
@@ -554,6 +568,19 @@ end)
 RegisterNetEvent('manufacturing:getPlayerStats')
 AddEventHandler('manufacturing:getPlayerStats', function()
     local src = source
+    
+    if not hasManufacturingAccess(src) then
+        TriggerClientEvent('ox_lib:notify', src, {
+            title = '🚫 Access Denied',
+            description = 'Manufacturing access restricted to Hurst Industries employees',
+            type = 'error',
+            duration = 5000,
+            position = Config.UI.notificationPosition,
+            markdown = Config.UI.enableMarkdown
+        })
+        return
+    end
+    
     local xPlayer = QBCore.Functions.GetPlayer(src)
     if not xPlayer then return end
     
@@ -587,6 +614,18 @@ RegisterNetEvent('manufacturing:getFacilityStatus')
 AddEventHandler('manufacturing:getFacilityStatus', function()
     local src = source
     
+    if not hasManufacturingAccess(src) then
+        TriggerClientEvent('ox_lib:notify', src, {
+            title = '🚫 Access Denied',
+            description = 'Manufacturing access restricted to Hurst Industries employees',
+            type = 'error',
+            duration = 5000,
+            position = Config.UI.notificationPosition,
+            markdown = Config.UI.enableMarkdown
+        })
+        return
+    end
+    
     -- Count active processes per facility
     local facilityStats = {}
     for processId, process in pairs(activeManufacturingProcesses) do
@@ -614,6 +653,10 @@ AddEventHandler('manufacturing:emergencyProduction', function(recipeId, quantity
     local src = source
     
     if not Config.ManufacturingIntegration.emergencyProduction.enabled then return end
+    
+    if not hasManufacturingAccess(src) then
+        return
+    end
     
     -- Emergency production gets priority processing
     local success, message, data = startManufacturing(src, recipeId, quantity, "standard", facilityId)
@@ -733,3 +776,5 @@ exports('getManufacturingSkill', getManufacturingSkill)
 exports('startEmergencyProduction', function(playerId, recipeId, quantity, facilityId)
     TriggerEvent('manufacturing:emergencyProduction', recipeId, quantity, facilityId)
 end)
+
+print("[MANUFACTURING] Server logic initialized")

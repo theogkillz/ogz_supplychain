@@ -30,6 +30,48 @@ Config.AdminSystem = {
     }
 }
 
+-- Universal job validation functions
+Config.JobValidation = {
+    -- Core job validation
+    validateHurstAccess = function(playerJob)
+        return playerJob == "hurst"
+    end,
+    
+    -- Feature-specific validation
+    validateAchievementAccess = function(playerJob)
+        return playerJob == "hurst"
+    end,
+    
+    validateNPCAccess = function(playerJob)
+        return playerJob == "hurst"
+    end,
+    
+    validateVehicleOwnership = function(playerJob)
+        return playerJob == "hurst"
+    end,
+    
+    validateManufacturingAccess = function(playerJob)
+        return playerJob == "hurst"
+    end,
+    
+    validateWarehouseAccess = function(playerJob)
+        return playerJob == "hurst"
+    end,
+    
+    -- Get standard error messages
+    getAccessDeniedMessage = function(feature, currentJob)
+        local messages = {
+            achievement = "🚫 Achievement system restricted to Hurst Industries employees",
+            npc = "🚫 NPC delivery system restricted to Hurst Industries employees",
+            vehicle = "🚫 Vehicle ownership restricted to Hurst Industries employees",
+            manufacturing = "🚫 Manufacturing access restricted to Hurst Industries employees",
+            warehouse = "🚫 Warehouse access restricted to Hurst Industries employees"
+        }
+        
+        local baseMessage = messages[feature] or "🚫 Access restricted to Hurst Industries employees"
+        return string.format("%s. Current job: %s", baseMessage, currentJob or "unemployed")
+    end
+}
 -- ===================================
 -- JOB RESTRICTIONS
 -- ===================================
@@ -468,5 +510,210 @@ Config.EmergencyOrders = {
             timeout = 7200,  -- 2 hours
             broadcastToAll = false
         }
+    }
+}
+
+Config.AchievementVehicles = {
+    enabled = true,
+    
+    -- Achievement tiers and their vehicle benefits
+    performanceTiers = {
+        ["rookie"] = {
+            name = "Rookie Driver",
+            requirement = "Complete 10 deliveries",
+            colorTint = {r = 200, g = 200, b = 200}, -- Silver
+            performanceMods = {
+                [11] = 0, -- Engine - Stock
+                [12] = 0, -- Brakes - Stock  
+                [13] = 0, -- Transmission - Stock
+                [15] = 0, -- Suspension - Stock
+                [18] = 0  -- Turbo - Off
+            },
+            speedMultiplier = 1.0,
+            accelerationBonus = 0.0,
+            fuelEfficiency = 1.0,
+            description = "Standard delivery vehicle performance"
+        },
+        
+        ["experienced"] = {
+            name = "Experienced Driver", 
+            requirement = "Complete 50 deliveries with 80%+ rating",
+            colorTint = {r = 50, g = 150, b = 255}, -- Blue
+            performanceMods = {
+                [11] = 1, -- Engine - Level 1
+                [12] = 1, -- Brakes - Level 1
+                [13] = 1, -- Transmission - Level 1
+                [15] = 0, -- Suspension - Stock
+                [18] = 0  -- Turbo - Off
+            },
+            speedMultiplier = 1.05,
+            accelerationBonus = 0.10,
+            fuelEfficiency = 1.05,
+            description = "Enhanced engine and braking performance"
+        },
+        
+        ["professional"] = {
+            name = "Professional Driver",
+            requirement = "Complete 150 deliveries with 85%+ rating",
+            colorTint = {r = 128, g = 0, b = 128}, -- Purple
+            performanceMods = {
+                [11] = 2, -- Engine - Level 2
+                [12] = 2, -- Brakes - Level 2
+                [13] = 2, -- Transmission - Level 2
+                [15] = 1, -- Suspension - Level 1
+                [18] = 0  -- Turbo - Off
+            },
+            speedMultiplier = 1.10,
+            accelerationBonus = 0.15,
+            fuelEfficiency = 1.10,
+            description = "Professional-grade performance upgrades"
+        },
+        
+        ["elite"] = {
+            name = "Elite Driver",
+            requirement = "Complete 300 deliveries with 90%+ rating",
+            colorTint = {r = 255, g = 215, b = 0}, -- Gold
+            performanceMods = {
+                [11] = 3, -- Engine - Level 3
+                [12] = 2, -- Brakes - Level 2
+                [13] = 2, -- Transmission - Level 2
+                [15] = 2, -- Suspension - Level 2
+                [18] = 1  -- Turbo - Level 1
+            },
+            speedMultiplier = 1.15,
+            accelerationBonus = 0.20,
+            fuelEfficiency = 1.15,
+            description = "Elite performance with turbo boost"
+        },
+        
+        ["legendary"] = {
+            name = "Legendary Driver",
+            requirement = "Complete 500 deliveries with 95%+ rating + Team achievements",
+            colorTint = {r = 255, g = 0, b = 0}, -- Red
+            performanceMods = {
+                [11] = 4, -- Engine - Max
+                [12] = 3, -- Brakes - Level 3
+                [13] = 3, -- Transmission - Level 3
+                [15] = 3, -- Suspension - Level 3
+                [18] = 1  -- Turbo - Level 1
+            },
+            speedMultiplier = 1.25,
+            accelerationBonus = 0.30,
+            fuelEfficiency = 1.25,
+            specialEffects = {
+                underglow = true,
+                customLivery = true,
+                hornUpgrade = true
+            },
+            description = "Maximum performance legendary vehicle"
+        }
+    },
+    
+    -- Visual effects for different tiers
+    visualEffects = {
+        underglow = {
+            enabled = true,
+            colors = {
+                ["elite"] = {r = 255, g = 215, b = 0},      -- Gold
+                ["legendary"] = {r = 255, g = 0, b = 0}     -- Red
+            }
+        },
+        
+        liveries = {
+            ["professional"] = 1, -- Delivery company livery
+            ["elite"] = 2,        -- Premium livery
+            ["legendary"] = 3     -- Exclusive livery
+        },
+        
+        hornSounds = {
+            ["elite"] = "HORN_TRUCK_01",
+            ["legendary"] = "HORN_TRUCK_02"
+        }
+    }
+}
+
+-- ============================================
+-- MARKET-DYNAMIC NPC DELIVERY SYSTEM
+-- NPCs only available during surplus conditions
+-- ============================================
+
+Config.NPCDeliverySystem = {
+    enabled = true,
+    
+    -- Surplus thresholds that enable NPC jobs
+    surplusThresholds = {
+        moderate_surplus = {
+            stockPercentage = 80,           -- 80% of max warehouse stock
+            npcPayMultiplier = 0.7,         -- NPCs get 70% of player pay
+            maxConcurrentJobs = 1,          -- Only 1 NPC job at a time
+            cooldownMinutes = 30,           -- 30 min cooldown between NPC jobs
+            playerRequirement = "initiate", -- Player must start the job
+            description = "Moderate surplus - basic NPC assistance available"
+        },
+        
+        high_surplus = {
+            stockPercentage = 90,           -- 90% of max warehouse stock  
+            npcPayMultiplier = 0.8,         -- NPCs get 80% of player pay
+            maxConcurrentJobs = 2,          -- Up to 2 concurrent NPC jobs
+            cooldownMinutes = 20,           -- 20 min cooldown
+            playerRequirement = "initiate", -- Still requires player initiation
+            description = "High surplus - enhanced NPC assistance available"
+        },
+        
+        critical_surplus = {
+            stockPercentage = 95,           -- 95% of max warehouse stock
+            npcPayMultiplier = 0.9,         -- NPCs get 90% of player pay
+            maxConcurrentJobs = 3,          -- Up to 3 concurrent NPC jobs
+            cooldownMinutes = 15,           -- 15 min cooldown
+            playerRequirement = "initiate", -- Player must still initiate
+            emergencyMode = true,           -- Special emergency mode
+            description = "Critical surplus - maximum NPC assistance to clear backlog"
+        }
+    },
+    
+    -- NPC behavior settings
+    npcBehavior = {
+        guaranteedCompletion = true,        -- NPCs always complete jobs (no skill factor)
+        randomFailureChance = 0.05,         -- 5% chance of "breakdown" or delay
+        baseCompletionTime = 300,           -- 5 minutes base completion time
+        timeVariation = 120,                -- ±2 minutes random variation
+        noTimeBonus = true,                 -- NPCs don't get speed bonuses
+        noQualityBonus = true,              -- NPCs don't get quality bonuses
+        basicPayOnly = true,                -- NPCs only get basic delivery pay
+    },
+    
+    -- Integration with market dynamics
+    marketIntegration = {
+        reducesPrices = true,               -- NPC deliveries slightly reduce market prices
+        priceReductionFactor = 0.02,        -- 2% price reduction per NPC delivery
+        preventsMarketCrash = true,         -- Helps prevent market crashes from oversupply
+        balancingEffect = true,             -- Helps balance supply/demand automatically
+    },
+    
+    -- Player interaction requirements
+    playerRequirements = {
+        mustBeOnDuty = true,                -- Player must be on warehouse duty
+        mustInitiateJob = true,             -- Player must manually start NPC jobs
+        cannotBePassive = true,             -- No passive income generation
+        limitPerPlayer = 2,                 -- Max 2 NPC jobs per player per cooldown period
+        requiresWarehouseAccess = true,     -- Must have warehouse job access
+    }
+}
+
+Config.SystemIntegration = {
+    achievements = {
+        enabled = true,
+        vehicleModsEnabled = true,
+        trackDeliveryRating = true,
+        trackTeamDeliveries = true,
+        updateInterval = 60 -- seconds
+    },
+    
+    npcSystem = {
+        enabled = true,
+        requireSurplus = true,
+        allowPassiveIncome = false,
+        maxConcurrentPerPlayer = 2,
+        integrationWithMarket = true
     }
 }

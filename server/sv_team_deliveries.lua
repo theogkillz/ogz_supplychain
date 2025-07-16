@@ -295,14 +295,30 @@ startTeamDelivery = function(teamId)
         })
         
         -- Spawn delivery vehicles for each member
-        TriggerClientEvent('team:spawnDeliveryVehicle', member.source, {
-            teamId = teamId,
-            restaurantId = team.restaurantId,
-            boxesAssigned = member.boxesAssigned,
-            memberRole = (citizenid == team.leaderId) and 'leader' or 'member',
-            teamData = team
-        })
-    end
+        RegisterNetEvent("team:spawnDeliveryVehicle")
+        AddEventHandler("team:spawnDeliveryVehicle", function(teamData)
+            local src = source
+            local xPlayer = QBCore.Functions.GetPlayer(src)
+            if not xPlayer then return end
+            
+            local citizenid = xPlayer.PlayerData.citizenid
+            
+            -- Get achievement tier for team leader (or highest in team)
+            local achievementTier = "rookie"
+            
+            if teamData.memberRole == "leader" then
+                achievementTier = exports['ogz_supplychain']:getPlayerAchievementTier(citizenid)
+            else
+                -- For team members, could use leader's tier or individual tier
+                achievementTier = exports['ogz_supplychain']:getPlayerAchievementTier(citizenid)
+            end
+            
+            -- Enhanced team data with achievement info
+            teamData.achievementTier = achievementTier
+            teamData.performanceBonus = Config.AchievementVehicles.performanceTiers[achievementTier].speedMultiplier
+            
+            TriggerClientEvent("team:spawnAchievementVehicle", src, teamData, achievementTier)
+        end)
     
     -- Update order status to accepted
     MySQL.Async.execute('UPDATE supply_orders SET status = ? WHERE order_group_id = ?', 
