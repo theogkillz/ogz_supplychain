@@ -5,6 +5,9 @@
 
 local QBCore = exports['qb-core']:GetCoreObject()
 
+local showTestResults
+local type = type
+
 -- Test results tracking
 local testResults = {
     passed = 0,

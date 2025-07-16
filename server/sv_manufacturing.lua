@@ -21,7 +21,7 @@ local function hasManufacturingAccess(source)
         return false
     end
     
-    local playerJob = Player.PlayerData.job.name
+    local playerJob = Player and Player.PlayerData and Player.PlayerData.job and Player.PlayerData.job.name
     return playerJob == "hurst"
 end
 
@@ -46,12 +46,13 @@ end
 -- Update manufacturing skill
 local function updateManufacturingSkill(citizenid, category, experience)
     local currentSkill = getManufacturingSkill(citizenid, category)
-    local skillConfig = Config.ManufacturingSkills.skillCategories[category]
+    local skillConfig = Config.ManufacturingSkills and Config.ManufacturingSkills.skillCategories and 
+                       Config.ManufacturingSkills.skillCategories[category]
     
     if not skillConfig then return end
     
-    local maxLevel = skillConfig.maxLevel
-    local experienceRate = skillConfig.experienceRate
+    local maxLevel = skillConfig.maxLevel or 100
+    local experienceRate = skillConfig.experienceRate or 1.0
     
     -- Calculate new experience (simplified leveling)
     local adjustedExperience = experience * experienceRate
@@ -79,11 +80,11 @@ local function updateManufacturingSkill(citizenid, category, experience)
             TriggerClientEvent('ox_lib:notify', src, {
                 title = '🎯 Skill Level Up!',
                 description = string.format('**%s** skill increased to level **%d**!', 
-                    skillConfig.name, math.floor(newSkill)),
+                    skillConfig.name or category, math.floor(newSkill)),
                 type = 'success',
                 duration = 8000,
-                position = Config.UI.notificationPosition,
-                markdown = Config.UI.enableMarkdown
+                position = Config.UI and Config.UI.notificationPosition or "top",
+                markdown = Config.UI and Config.UI.enableMarkdown or false
             })
         end
     end
@@ -91,18 +92,20 @@ end
 
 -- Calculate processing cost
 local function calculateProcessingCost(recipe, quantity, qualityLevel)
-    local costs = Config.Manufacturing.processingCosts
-    local baseCost = costs.baseProcessingFee
+    local costs = Config.Manufacturing and Config.Manufacturing.processingCosts
+    if not costs then return 100 end -- Fallback cost
+    
+    local baseCost = costs.baseProcessingFee or 50
     
     -- Add electricity and maintenance costs
-    local processingTime = recipe.processingTime * quantity
-    local electricityCost = (processingTime / 3600) * costs.electricityCost -- Per hour
-    local maintenanceCost = costs.maintenanceFee * quantity
+    local processingTime = (recipe.processingTime or 60) * quantity
+    local electricityCost = (processingTime / 3600) * (costs.electricityCost or 10) -- Per hour
+    local maintenanceCost = (costs.maintenanceFee or 5) * quantity
     
     -- Quality bonus cost
     local qualityCost = 0
     if qualityLevel == "premium" or qualityLevel == "organic" then
-        qualityCost = costs.qualityBonusCost * quantity
+        qualityCost = (costs.qualityBonusCost or 15) * quantity
     end
     
     return math.floor(baseCost + electricityCost + maintenanceCost + qualityCost)
@@ -110,16 +113,20 @@ end
 
 -- Calculate processing time with bonuses
 local function calculateProcessingTime(recipe, quantity, citizenid, qualityLevel)
-    local timing = Config.Manufacturing.timing
-    local baseTime = timing.baseProcessingTime
-    local timePerItem = timing.timePerItem * (quantity - 1) -- First item included in base time
+    local timing = Config.Manufacturing and Config.Manufacturing.timing
+    if not timing then
+        return 60000 -- Fallback: 60 seconds
+    end
+    
+    local baseTime = timing.baseProcessingTime or 30000
+    local timePerItem = (timing.timePerItem or 5000) * (quantity - 1) -- First item included in base time
     
     -- Quality processing multiplier
     local qualityMultiplier = 1.0
     if qualityLevel == "premium" then
-        qualityMultiplier = timing.qualityProcessingMultiplier
+        qualityMultiplier = timing.qualityProcessingMultiplier or 1.2
     elseif qualityLevel == "organic" then
-        qualityMultiplier = timing.qualityProcessingMultiplier * 1.2
+        qualityMultiplier = (timing.qualityProcessingMultiplier or 1.2) * 1.2
     end
     
     local totalTime = (baseTime + timePerItem) * qualityMultiplier
@@ -128,9 +135,11 @@ local function calculateProcessingTime(recipe, quantity, citizenid, qualityLevel
     local skillLevel = getManufacturingSkill(citizenid, recipe.category)
     local speedBonus = 0
     
-    for level, bonus in pairs(Config.ManufacturingSkills.levelBonuses) do
-        if skillLevel >= level then
-            speedBonus = bonus.speedBonus
+    if Config.ManufacturingSkills and Config.ManufacturingSkills.levelBonuses then
+        for level, bonus in pairs(Config.ManufacturingSkills.levelBonuses) do
+            if skillLevel >= level and bonus and bonus.speedBonus then
+                speedBonus = bonus.speedBonus
+            end
         end
     end
     
@@ -138,12 +147,14 @@ local function calculateProcessingTime(recipe, quantity, citizenid, qualityLevel
     totalTime = totalTime * (1 - speedBonus)
     
     -- Cap processing time
-    return math.min(totalTime, timing.maxProcessingTime)
+    return math.min(totalTime, timing.maxProcessingTime or 300000)
 end
 
 -- Calculate yield with bonuses
 local function calculateYield(recipe, quantity, citizenid, qualityLevel, qualitySuccess)
-    local baseYield = recipe.outputs[next(recipe.outputs)].quantity * quantity
+    local baseYield = recipe.outputs and recipe.outputs[next(recipe.outputs)] and 
+                     recipe.outputs[next(recipe.outputs)].quantity or 1
+    baseYield = baseYield * quantity
     
     if not qualitySuccess then
         -- Quality control failed, reduced yield
@@ -153,19 +164,24 @@ local function calculateYield(recipe, quantity, citizenid, qualityLevel, quality
     local yieldMultiplier = 1.0
     
     -- Quality yield multiplier
-    if qualityLevel == "premium" then
-        yieldMultiplier = Config.Manufacturing.qualityControl.premiumQuality.yieldMultiplier
-    elseif qualityLevel == "organic" then
-        yieldMultiplier = Config.Manufacturing.qualityControl.organicQuality.yieldMultiplier
+    local qualityControl = Config.Manufacturing and Config.Manufacturing.qualityControl
+    if qualityControl then
+        if qualityLevel == "premium" and qualityControl.premiumQuality then
+            yieldMultiplier = qualityControl.premiumQuality.yieldMultiplier or 1.0
+        elseif qualityLevel == "organic" and qualityControl.organicQuality then
+            yieldMultiplier = qualityControl.organicQuality.yieldMultiplier or 1.0
+        end
     end
     
     -- Apply skill bonuses
     local skillLevel = getManufacturingSkill(citizenid, recipe.category)
     local yieldBonus = 0
     
-    for level, bonus in pairs(Config.ManufacturingSkills.levelBonuses) do
-        if skillLevel >= level then
-            yieldBonus = bonus.yieldBonus
+    if Config.ManufacturingSkills and Config.ManufacturingSkills.levelBonuses then
+        for level, bonus in pairs(Config.ManufacturingSkills.levelBonuses) do
+            if skillLevel >= level and bonus and bonus.yieldBonus then
+                yieldBonus = bonus.yieldBonus
+            end
         end
     end
     
@@ -176,11 +192,11 @@ end
 
 -- Check if recipe can be processed at facility
 local function canProcessRecipeAtFacility(recipe, facilityId)
-    local facility = Config.ManufacturingFacilities[facilityId]
+    local facility = Config.ManufacturingFacilities and Config.ManufacturingFacilities[facilityId]
     if not facility then return false end
     
     -- Check if facility specialization matches recipe
-    if recipe.facility_specialization then
+    if recipe.facility_specialization and facility.specializations then
         for _, specialization in ipairs(facility.specializations) do
             if specialization == recipe.facility_specialization then
                 return true
@@ -194,9 +210,14 @@ end
 
 -- Quality control check
 local function performQualityControl(recipe, qualityLevel, skillLevel)
-    local qualityConfig = Config.Manufacturing.qualityControl[qualityLevel .. "Quality"]
+    local qualityControl = Config.Manufacturing and Config.Manufacturing.qualityControl
+    if not qualityControl then
+        return true, 1.0 -- Default success if no quality config
+    end
+    
+    local qualityConfig = qualityControl[qualityLevel .. "Quality"]
     if not qualityConfig then
-        qualityConfig = Config.Manufacturing.qualityControl.standardQuality
+        qualityConfig = qualityControl.standardQuality or {successRate = 0.8, requiredSkill = 0}
     end
     
     -- Check skill requirement
@@ -206,7 +227,7 @@ local function performQualityControl(recipe, qualityLevel, skillLevel)
     
     -- Random success check
     local successRoll = math.random()
-    local successRate = qualityConfig.successRate
+    local successRate = qualityConfig.successRate or 0.8
     
     -- Skill bonus to success rate (up to 10% bonus at max skill)
     local skillBonus = (skillLevel / 100) * 0.1
@@ -224,8 +245,10 @@ local function startManufacturing(src, recipeId, quantity, qualityLevel, facilit
     local xPlayer = QBCore.Functions.GetPlayer(src)
     if not xPlayer then return false, "Player not found" end
     
-    local citizenid = xPlayer.PlayerData.citizenid
-    local recipe = Config.ManufacturingRecipes[recipeId]
+    local citizenid = xPlayer.PlayerData and xPlayer.PlayerData.citizenid
+    if not citizenid then return false, "Invalid player data" end
+    
+    local recipe = Config.ManufacturingRecipes and Config.ManufacturingRecipes[recipeId]
     
     if not recipe then
         return false, "Recipe not found"
@@ -237,7 +260,9 @@ local function startManufacturing(src, recipeId, quantity, qualityLevel, facilit
     end
     
     -- Validate quantity
-    if quantity <= 0 or quantity > Config.Manufacturing.containerSystem.maxItemsPerBatch then
+    local maxItems = Config.Manufacturing and Config.Manufacturing.containerSystem and 
+                    Config.Manufacturing.containerSystem.maxItemsPerBatch or 50
+    if quantity <= 0 or quantity > maxItems then
         return false, "Invalid quantity"
     end
     
@@ -251,18 +276,20 @@ local function startManufacturing(src, recipeId, quantity, qualityLevel, facilit
     local hasIngredients = true
     local missingIngredients = {}
     
-    for ingredient, requiredAmount in pairs(recipe.inputs) do
-        local totalRequired = requiredAmount * quantity
-        local playerAmount = exports.ox_inventory:GetItemCount(src, ingredient)
-        
-        if playerAmount < totalRequired then
-            hasIngredients = false
-            table.insert(missingIngredients, {
-                item = ingredient,
-                required = totalRequired,
-                current = playerAmount,
-                missing = totalRequired - playerAmount
-            })
+    if recipe.inputs then
+        for ingredient, requiredAmount in pairs(recipe.inputs) do
+            local totalRequired = requiredAmount * quantity
+            local playerAmount = exports.ox_inventory:GetItemCount(src, ingredient) or 0
+            
+            if playerAmount < totalRequired then
+                hasIngredients = false
+                table.insert(missingIngredients, {
+                    item = ingredient,
+                    required = totalRequired,
+                    current = playerAmount,
+                    missing = totalRequired - playerAmount
+                })
+            end
         end
     end
     
@@ -274,7 +301,8 @@ local function startManufacturing(src, recipeId, quantity, qualityLevel, facilit
     local processingCost = calculateProcessingCost(recipe, quantity, qualityLevel)
     
     -- Check if player can afford processing cost
-    if xPlayer.PlayerData.money.cash < processingCost then
+    local playerMoney = xPlayer.PlayerData and xPlayer.PlayerData.money and xPlayer.PlayerData.money.cash or 0
+    if playerMoney < processingCost then
         return false, "Insufficient cash for processing. Cost: $" .. processingCost
     end
     
@@ -284,12 +312,14 @@ local function startManufacturing(src, recipeId, quantity, qualityLevel, facilit
     end
     
     -- Remove ingredients
-    for ingredient, requiredAmount in pairs(recipe.inputs) do
-        local totalRequired = requiredAmount * quantity
-        if not exports.ox_inventory:RemoveItem(src, ingredient, totalRequired) then
-            -- Refund money if ingredient removal fails
-            xPlayer.Functions.AddMoney('cash', processingCost, "Manufacturing refund")
-            return false, "Failed to remove ingredients"
+    if recipe.inputs then
+        for ingredient, requiredAmount in pairs(recipe.inputs) do
+            local totalRequired = requiredAmount * quantity
+            if not exports.ox_inventory:RemoveItem(src, ingredient, totalRequired) then
+                -- Refund money if ingredient removal fails
+                xPlayer.Functions.AddMoney('cash', processingCost, "Manufacturing refund")
+                return false, "Failed to remove ingredients"
+            end
         end
     end
     
@@ -353,8 +383,12 @@ local function completeManufacturing(processId)
     local finalYield = calculateYield(recipe, quantity, citizenid, qualityLevel, qualitySuccess)
     
     -- Get output item
-    local outputItem = next(recipe.outputs)
-    local outputData = recipe.outputs[outputItem]
+    local outputItem = recipe.outputs and next(recipe.outputs)
+    local outputData = recipe.outputs and recipe.outputs[outputItem]
+    
+    if not outputItem then
+        return false, "No output item defined in recipe"
+    end
     
     -- Determine final output item name based on quality
     local finalOutputItem = outputItem
@@ -369,7 +403,7 @@ local function completeManufacturing(processId)
     local success = exports.ox_inventory:AddItem(process.playerId, finalOutputItem, finalYield)
     if not success then
         -- Try to give money equivalent if inventory full
-        local itemValue = outputData.value or 50 -- Fallback value
+        local itemValue = outputData and outputData.value or 50 -- Fallback value
         local refundAmount = finalYield * itemValue
         xPlayer.Functions.AddMoney('bank', refundAmount, "Manufacturing output refund")
         
@@ -379,13 +413,13 @@ local function completeManufacturing(processId)
                 refundAmount, finalYield, finalOutputItem),
             type = 'warning',
             duration = 10000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
     else
         -- Successful manufacturing notification
         local qualityText = qualitySuccess and (" (" .. qualityLevel .. " quality)") or " (quality control failed)"
-        local itemLabel = exports.ox_inventory:Items()[finalOutputItem] and 
+        local itemLabel = exports.ox_inventory:Items() and exports.ox_inventory:Items()[finalOutputItem] and 
             exports.ox_inventory:Items()[finalOutputItem].label or finalOutputItem
         
         TriggerClientEvent('manufacturing:processCompleted', process.playerId, {
@@ -400,13 +434,15 @@ local function completeManufacturing(processId)
                 finalYield, itemLabel, qualityText),
             type = qualitySuccess and 'success' or 'warning',
             duration = 12000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
     end
     
     -- Update manufacturing skills
-    local experienceGained = Config.ManufacturingSkills.experienceRewards[qualityLevel] or 10
+    local experienceRewards = Config.ManufacturingSkills and Config.ManufacturingSkills.experienceRewards
+    local experienceGained = experienceRewards and experienceRewards[qualityLevel] or 10
+    
     if qualitySuccess then
         experienceGained = experienceGained * quantity
     else
@@ -416,7 +452,8 @@ local function completeManufacturing(processId)
     updateManufacturingSkill(citizenid, recipe.category, experienceGained)
     
     -- Update warehouse stock if integration enabled
-    if Config.ManufacturingIntegration.warehouseIntegration.enabled then
+    local warehouseIntegration = Config.ManufacturingIntegration and Config.ManufacturingIntegration.warehouseIntegration
+    if warehouseIntegration and warehouseIntegration.enabled then
         MySQL.Async.execute([[
             INSERT INTO supply_warehouse_stock (ingredient, quantity)
             VALUES (?, ?)
@@ -424,21 +461,22 @@ local function completeManufacturing(processId)
                 quantity = quantity + VALUES(quantity)
         ]], {finalOutputItem, finalYield})
         
-        if Config.ManufacturingIntegration.warehouseIntegration.deliveryNotification then
+        if warehouseIntegration.deliveryNotification then
             -- Notify warehouse workers
             local players = QBCore.Functions.GetPlayers()
             for _, playerId in ipairs(players) do
                 local player = QBCore.Functions.GetPlayer(playerId)
-                if player and player.PlayerData.job.name == "hurst" then
+                if player and player.PlayerData and player.PlayerData.job and 
+                   player.PlayerData.job.name == "hurst" then
                     TriggerClientEvent('ox_lib:notify', playerId, {
                         title = '📦 New Stock Delivered',
                         description = string.format('%d %s added to warehouse', 
-                            finalYield, exports.ox_inventory:Items()[finalOutputItem] and
+                            finalYield, exports.ox_inventory:Items() and exports.ox_inventory:Items()[finalOutputItem] and
                             exports.ox_inventory:Items()[finalOutputItem].label or finalOutputItem),
                         type = 'info',
                         duration = 8000,
-                        position = Config.UI.notificationPosition,
-                        markdown = Config.UI.enableMarkdown
+                        position = Config.UI and Config.UI.notificationPosition or "top",
+                        markdown = Config.UI and Config.UI.enableMarkdown or false
                     })
                 end
             end
@@ -456,7 +494,8 @@ local function completeManufacturing(processId)
     })
     
     -- Trigger achievement tracking
-    if Config.ManufacturingIntegration.achievements.enabled then
+    local achievementConfig = Config.ManufacturingIntegration and Config.ManufacturingIntegration.achievements
+    if achievementConfig and achievementConfig.enabled then
         TriggerEvent('achievements:trackManufacturing', process.playerId, {
             recipeId = process.recipeId,
             category = recipe.category,
@@ -483,35 +522,38 @@ AddEventHandler('manufacturing:getRecipes', function(facilityId)
     
     if not hasManufacturingAccess(src) then
         local Player = QBCore.Functions.GetPlayer(src)
-        local currentJob = Player and Player.PlayerData.job.name or "unemployed"
+        local currentJob = Player and Player.PlayerData and Player.PlayerData.job and 
+                          Player.PlayerData.job.name or "unemployed"
         
         TriggerClientEvent('ox_lib:notify', src, {
             title = '🚫 Access Denied',
             description = 'Hurst Industries employees only. Current job: ' .. currentJob,
             type = 'error',
             duration = 8000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         return
     end
     
-    local facility = Config.ManufacturingFacilities[facilityId]
+    local facility = Config.ManufacturingFacilities and Config.ManufacturingFacilities[facilityId]
     if not facility then return end
     
     local availableRecipes = {}
-    for recipeId, recipe in pairs(Config.ManufacturingRecipes) do
-        if canProcessRecipeAtFacility(recipe, facilityId) then
-            table.insert(availableRecipes, {
-                id = recipeId,
-                name = recipe.name,
-                category = recipe.category,
-                inputs = recipe.inputs,
-                outputs = recipe.outputs,
-                processingTime = recipe.processingTime,
-                skillRequired = recipe.skillRequired,
-                description = recipe.description
-            })
+    if Config.ManufacturingRecipes then
+        for recipeId, recipe in pairs(Config.ManufacturingRecipes) do
+            if canProcessRecipeAtFacility(recipe, facilityId) then
+                table.insert(availableRecipes, {
+                    id = recipeId,
+                    name = recipe.name,
+                    category = recipe.category,
+                    inputs = recipe.inputs,
+                    outputs = recipe.outputs,
+                    processingTime = recipe.processingTime,
+                    skillRequired = recipe.skillRequired,
+                    description = recipe.description
+                })
+            end
         end
     end
     
@@ -526,15 +568,16 @@ AddEventHandler('manufacturing:startProcess', function(recipeId, quantity, quali
     -- Validate job access
     if not hasManufacturingAccess(src) then
         local Player = QBCore.Functions.GetPlayer(src)
-        local currentJob = Player and Player.PlayerData.job.name or "unemployed"
+        local currentJob = Player and Player.PlayerData and Player.PlayerData.job and 
+                          Player.PlayerData.job.name or "unemployed"
         
         TriggerClientEvent('ox_lib:notify', src, {
             title = '🚫 Access Denied',
             description = 'Hurst Industries employees only. Current job: ' .. currentJob,
             type = 'error',
             duration = 8000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         return
     end
@@ -545,17 +588,18 @@ AddEventHandler('manufacturing:startProcess', function(recipeId, quantity, quali
         TriggerClientEvent('manufacturing:processStarted', src, data)
         
         -- Schedule completion
-        Citizen.SetTimeout(data.processingTime, function()
-            completeManufacturing(data.processId)
-        end)
-    else
+        if data and data.processingTime and data.processId then
+            Citizen.SetTimeout(data.processingTime, function()
+                completeManufacturing(data.processId)
+            end)
+        end
         TriggerClientEvent('ox_lib:notify', src, {
             title = 'Manufacturing Failed',
             description = message,
             type = 'error',
             duration = 8000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         
         if data then -- Missing ingredients data
@@ -575,8 +619,8 @@ AddEventHandler('manufacturing:getPlayerStats', function()
             description = 'Manufacturing access restricted to Hurst Industries employees',
             type = 'error',
             duration = 5000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         return
     end
@@ -584,7 +628,8 @@ AddEventHandler('manufacturing:getPlayerStats', function()
     local xPlayer = QBCore.Functions.GetPlayer(src)
     if not xPlayer then return end
     
-    local citizenid = xPlayer.PlayerData.citizenid
+    local citizenid = xPlayer.PlayerData and xPlayer.PlayerData.citizenid
+    if not citizenid then return end
     
     -- Get skills
     MySQL.Async.fetchAll('SELECT * FROM manufacturing_skills WHERE citizenid = ?', {citizenid}, function(skills)
@@ -602,8 +647,8 @@ AddEventHandler('manufacturing:getPlayerStats', function()
             
             TriggerClientEvent('manufacturing:showPlayerStats', src, {
                 skills = skills or {},
-                stats = stats[1] or {},
-                skillCategories = Config.ManufacturingSkills.skillCategories
+                stats = stats and stats[1] or {},
+                skillCategories = Config.ManufacturingSkills and Config.ManufacturingSkills.skillCategories or {}
             })
         end)
     end)
@@ -620,8 +665,8 @@ AddEventHandler('manufacturing:getFacilityStatus', function()
             description = 'Manufacturing access restricted to Hurst Industries employees',
             type = 'error',
             duration = 5000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         return
     end
@@ -652,7 +697,8 @@ RegisterNetEvent('manufacturing:emergencyProduction')
 AddEventHandler('manufacturing:emergencyProduction', function(recipeId, quantity, facilityId)
     local src = source
     
-    if not Config.ManufacturingIntegration.emergencyProduction.enabled then return end
+    local emergencyConfig = Config.ManufacturingIntegration and Config.ManufacturingIntegration.emergencyProduction
+    if not emergencyConfig or not emergencyConfig.enabled then return end
     
     if not hasManufacturingAccess(src) then
         return
@@ -663,23 +709,23 @@ AddEventHandler('manufacturing:emergencyProduction', function(recipeId, quantity
     
     if success then
         -- Apply emergency multipliers
-        local emergencyTime = data.processingTime / Config.ManufacturingIntegration.emergencyProduction.priorityMultiplier
+        local emergencyTime = (data and data.processingTime or 60000) / (emergencyConfig and emergencyConfig.priorityMultiplier or 2)
         
         TriggerClientEvent('ox_lib:notify', src, {
             title = '🚨 Emergency Production Started',
             description = string.format('Priority processing: %d seconds', math.floor(emergencyTime / 1000)),
             type = 'warning',
             duration = 10000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         
         -- Schedule emergency completion
         Citizen.SetTimeout(emergencyTime, function()
-            local completed, yield, outputItem = completeManufacturing(data.processId)
+            local completed, yield, outputItem = completeManufacturing(data and data.processId or "unknown")
             if completed then
                 -- Emergency bonus payment
-                local bonusPayment = data.processingCost * Config.ManufacturingIntegration.emergencyProduction.bonusPayment
+                local bonusPayment = (data and data.processingCost or 0) * (emergencyConfig and emergencyConfig.bonusPayment or 0.5)
                 local xPlayer = QBCore.Functions.GetPlayer(src)
                 if xPlayer then
                     xPlayer.Functions.AddMoney('cash', bonusPayment, "Emergency production bonus")
@@ -689,8 +735,8 @@ AddEventHandler('manufacturing:emergencyProduction', function(recipeId, quantity
                         description = string.format('Received $%d emergency production bonus!', bonusPayment),
                         type = 'success',
                         duration = 8000,
-                        position = Config.UI.notificationPosition,
-                        markdown = Config.UI.enableMarkdown
+                        position = Config.UI and Config.UI.notificationPosition or "top",
+                        markdown = Config.UI and Config.UI.enableMarkdown or false
                     })
                 end
             end
@@ -753,7 +799,8 @@ AddEventHandler('playerDropped', function(reason)
     local xPlayer = QBCore.Functions.GetPlayer(src)
     if not xPlayer then return end
     
-    local citizenid = xPlayer.PlayerData.citizenid
+    local citizenid = xPlayer.PlayerData and xPlayer.PlayerData.citizenid
+    if not citizenid then return end
     
     -- Cancel active manufacturing processes for disconnected player
     for processId, process in pairs(activeManufacturingProcesses) do

@@ -7,77 +7,43 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
 -- ============================================
--- CONTAINER-ENHANCED WAREHOUSE FUNCTIONS
+-- UTILITY FUNCTIONS (DEFINED FIRST)
 -- ============================================
 
--- Check if container system is enabled
-local function isContainerSystemEnabled()
-    return Config.DynamicContainers and Config.DynamicContainers.enabled
+-- Check if player has warehouse access
+local function hasWarehouseAccess(source)
+    local Player = QBCore.Functions.GetPlayer(source)
+    if not Player then return false end
+    
+    local playerJob = Player and Player.PlayerData and Player.PlayerData.job and Player.PlayerData.job.name
+    return playerJob == "hurst"
 end
 
--- Enhanced order processing with container creation
-local function processWarehouseOrderWithContainers(orderGroupId, restaurantId, orders)
-    if not isContainerSystemEnabled() then
-        -- Fall back to original system
-        TriggerEvent('warehouse:processOrderOriginal', orderGroupId, restaurantId, orders)
-        return
-    end
-    
-    local containers = {}
-    local totalContainerCost = 0
-    local containerCreationSuccess = true
-    
-    -- Process each order item and create containers
-    for _, order in ipairs(orders) do
-        local ingredient = order.itemName:lower()
-        local quantity = order.quantity
+-- Get ingredient category for container selection
+local function getIngredientCategory(ingredient)
+    local categoryMappings = {
+        -- Meat products
+        ["slaughter_meat"] = "meat", ["slaughter_ground_meat"] = "meat", 
+        ["slaughter_chicken"] = "meat", ["slaughter_pork"] = "meat", ["slaughter_beef"] = "meat",
         
-        -- Create containers (max 12 items per container, no mixing)
-        while quantity > 0 and containerCreationSuccess do
-            local containerQuantity = math.min(quantity, Config.DynamicContainers.system.maxItemsPerContainer)
-            
-            -- Use the container creation export
-            local containerId = exports[GetCurrentResourceName()]:createContainer(
-                ingredient, containerQuantity, orderGroupId, restaurantId
-            )
-            
-            if containerId then
-                table.insert(containers, {
-                    containerId = containerId,
-                    ingredient = ingredient,
-                    quantity = containerQuantity,
-                    orderItemId = order.id
-                })
-                
-                -- Calculate container cost
-                local containerType = determineOptimalContainer(ingredient, containerQuantity)
-                local containerConfig = Config.DynamicContainers.containerTypes[containerType]
-                totalContainerCost = totalContainerCost + (containerConfig and containerConfig.cost or 15)
-                
-                quantity = quantity - containerQuantity
-            else
-                print("[WAREHOUSE CONTAINERS] Failed to create container for " .. ingredient)
-                containerCreationSuccess = false
-                break
-            end
-        end
+        -- Dairy products
+        ["milk"] = "dairy", ["cheese"] = "dairy", ["butter"] = "dairy",
         
-        if not containerCreationSuccess then break end
-    end
+        -- Vegetables
+        ["tomato"] = "vegetables", ["lettuce"] = "vegetables", ["onion"] = "vegetables", 
+        ["potato"] = "vegetables", ["carrot"] = "vegetables",
+        
+        -- Fruits
+        ["apple"] = "fruits", ["orange"] = "fruits", ["banana"] = "fruits",
+        
+        -- Frozen items
+        ["frozen_beef"] = "frozen", ["frozen_chicken"] = "frozen", ["ice_cream"] = "frozen",
+        
+        -- Dry goods
+        ["flour"] = "dry_goods", ["sugar"] = "dry_goods", ["rice"] = "dry_goods"
+    }
     
-    if containerCreationSuccess then
-        -- Load containers into delivery vehicle
-        exports[GetCurrentResourceName()]:loadContainersIntoVehicle(orderGroupId)
-        
-        -- Trigger enhanced vehicle spawn
-        TriggerEvent('warehouse:spawnContainerVehicle', orderGroupId, restaurantId, orders, containers, totalContainerCost)
-    else
-        -- Cleanup any created containers and fall back to original system
-        for _, container in ipairs(containers) do
-            MySQL.Async.execute('DELETE FROM supply_containers WHERE container_id = ?', {container.containerId})
-        end
-        TriggerEvent('warehouse:processOrderOriginal', orderGroupId, restaurantId, orders)
-    end
+    return categoryMappings[ingredient:lower()] or "dry_goods"
 end
 
 -- Determine optimal container type for ingredient
@@ -128,7 +94,7 @@ local function determineOptimalContainer(ingredient, quantity)
             
             -- Check availability
             local containerInventory = exports[GetCurrentResourceName()]:getContainerInventory()
-            local available = containerInventory[containerType] or 0
+            local available = containerInventory and containerInventory[containerType] or 0
             if available > 0 then
                 score = score + (available * 0.1)
             else
@@ -142,34 +108,84 @@ local function determineOptimalContainer(ingredient, quantity)
         end
     end
     
-    return bestContainer or Config.DynamicContainers.autoSelection.fallbackContainer or "ogz_crate"
+    return bestContainer or (Config.DynamicContainers.autoSelection and Config.DynamicContainers.autoSelection.fallbackContainer) or "ogz_crate"
 end
 
--- Get ingredient category for container selection
-local function getIngredientCategory(ingredient)
-    local categoryMappings = {
-        -- Meat products
-        ["slaughter_meat"] = "meat", ["slaughter_ground_meat"] = "meat", 
-        ["slaughter_chicken"] = "meat", ["slaughter_pork"] = "meat", ["slaughter_beef"] = "meat",
-        
-        -- Dairy products
-        ["milk"] = "dairy", ["cheese"] = "dairy", ["butter"] = "dairy",
-        
-        -- Vegetables
-        ["tomato"] = "vegetables", ["lettuce"] = "vegetables", ["onion"] = "vegetables", 
-        ["potato"] = "vegetables", ["carrot"] = "vegetables",
-        
-        -- Fruits
-        ["apple"] = "fruits", ["orange"] = "fruits", ["banana"] = "fruits",
-        
-        -- Frozen items
-        ["frozen_beef"] = "frozen", ["frozen_chicken"] = "frozen", ["ice_cream"] = "frozen",
-        
-        -- Dry goods
-        ["flour"] = "dry_goods", ["sugar"] = "dry_goods", ["rice"] = "dry_goods"
-    }
+-- Check if container system is enabled
+local function isContainerSystemEnabled()
+    return Config.DynamicContainers and Config.DynamicContainers.enabled
+end
+
+-- ============================================
+-- CONTAINER-ENHANCED WAREHOUSE FUNCTIONS
+-- ============================================
+
+-- Enhanced order processing with container creation
+local function processWarehouseOrderWithContainers(orderGroupId, restaurantId, orders)
+    if not isContainerSystemEnabled() then
+        -- Fall back to original system
+        TriggerEvent('warehouse:processOrderOriginal', orderGroupId, restaurantId, orders)
+        return
+    end
     
-    return categoryMappings[ingredient:lower()] or "dry_goods"
+    local containers = {}
+    local totalContainerCost = 0
+    local containerCreationSuccess = true
+    
+    -- Process each order item and create containers
+    for _, order in ipairs(orders) do
+        local ingredient = order.itemName:lower()
+        local quantity = order.quantity
+        
+        -- Create containers (max 12 items per container, no mixing)
+        while quantity > 0 and containerCreationSuccess do
+            local maxItems = Config.DynamicContainers and Config.DynamicContainers.system and 
+                           Config.DynamicContainers.system.maxItemsPerContainer or 12
+            local containerQuantity = math.min(quantity, maxItems)
+            
+            -- Use the container creation export
+            local containerId = exports[GetCurrentResourceName()]:createContainer(
+                ingredient, containerQuantity, orderGroupId, restaurantId
+            )
+            
+            if containerId then
+                table.insert(containers, {
+                    containerId = containerId,
+                    ingredient = ingredient,
+                    quantity = containerQuantity,
+                    orderItemId = order.id
+                })
+                
+                -- Calculate container cost
+                local containerType = determineOptimalContainer(ingredient, containerQuantity)
+                local containerConfig = Config.DynamicContainers and Config.DynamicContainers.containerTypes and 
+                                      Config.DynamicContainers.containerTypes[containerType]
+                totalContainerCost = totalContainerCost + (containerConfig and containerConfig.cost or 15)
+                
+                quantity = quantity - containerQuantity
+            else
+                print("[WAREHOUSE CONTAINERS] Failed to create container for " .. ingredient)
+                containerCreationSuccess = false
+                break
+            end
+        end
+        
+        if not containerCreationSuccess then break end
+    end
+    
+    if containerCreationSuccess then
+        -- Load containers into delivery vehicle
+        exports[GetCurrentResourceName()]:loadContainersIntoVehicle(orderGroupId)
+        
+        -- Trigger enhanced vehicle spawn
+        TriggerEvent('warehouse:spawnContainerVehicle', orderGroupId, restaurantId, orders, containers, totalContainerCost)
+    else
+        -- Cleanup any created containers and fall back to original system
+        for _, container in ipairs(containers) do
+            MySQL.Async.execute('DELETE FROM supply_containers WHERE container_id = ?', {container.containerId})
+        end
+        TriggerEvent('warehouse:processOrderOriginal', orderGroupId, restaurantId, orders)
+    end
 end
 
 -- ============================================
@@ -181,13 +197,15 @@ RegisterNetEvent('warehouse:acceptOrderWithContainers')
 AddEventHandler('warehouse:acceptOrderWithContainers', function(orderGroupId, restaurantId)
     local workerId = source
     
-    -- Check warehouse access (reuse existing function from main warehouse file)
-    if not hasWarehouseAccess or not hasWarehouseAccess(workerId) then
+    -- Check warehouse access
+    if not hasWarehouseAccess(workerId) then
         TriggerClientEvent('ox_lib:notify', workerId, {
             title = 'Access Denied',
             description = 'Warehouse access required.',
             type = 'error',
-            duration = 5000
+            duration = 5000,
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         return
     end
@@ -199,18 +217,22 @@ AddEventHandler('warehouse:acceptOrderWithContainers', function(orderGroupId, re
                 title = 'Error',
                 description = 'Order not found or already processed.',
                 type = 'error',
-                duration = 10000
+                duration = 10000,
+                position = Config.UI and Config.UI.notificationPosition or "top",
+                markdown = Config.UI and Config.UI.enableMarkdown or false
             })
             return
         end
 
-        local restaurantJob = Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].job
+        local restaurantJob = Config.Restaurants and Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].job
         if not restaurantJob then
             TriggerClientEvent('ox_lib:notify', workerId, {
                 title = 'Error',
                 description = 'Invalid restaurant ID.',
                 type = 'error',
-                duration = 10000
+                duration = 10000,
+                position = Config.UI and Config.UI.notificationPosition or "top",
+                markdown = Config.UI and Config.UI.enableMarkdown or false
             })
             return
         end
@@ -224,7 +246,7 @@ AddEventHandler('warehouse:acceptOrderWithContainers', function(orderGroupId, re
             local itemData = nil
             
             -- Find item in restaurant config
-            if Config.Items[restaurantJob] then
+            if Config.Items and Config.Items[restaurantJob] then
                 for category, categoryItems in pairs(Config.Items[restaurantJob]) do
                     if categoryItems[ingredient] then
                         itemData = categoryItems[ingredient]
@@ -238,7 +260,9 @@ AddEventHandler('warehouse:acceptOrderWithContainers', function(orderGroupId, re
                     title = 'Error',
                     description = 'Item not found: ' .. ingredient,
                     type = 'error',
-                    duration = 10000
+                    duration = 10000,
+                    position = Config.UI and Config.UI.notificationPosition or "top",
+                    markdown = Config.UI and Config.UI.enableMarkdown or false
                 })
                 return
             end
@@ -253,7 +277,9 @@ AddEventHandler('warehouse:acceptOrderWithContainers', function(orderGroupId, re
                     title = 'Insufficient Stock',
                     description = 'Not enough stock for **' .. itemLabel .. '**',
                     type = 'error',
-                    duration = 10000
+                    duration = 10000,
+                    position = Config.UI and Config.UI.notificationPosition or "top",
+                    markdown = Config.UI and Config.UI.enableMarkdown or false
                 })
                 return
             end
@@ -289,14 +315,18 @@ AddEventHandler('warehouse:acceptOrderWithContainers', function(orderGroupId, re
                     title = '📦 Container Order Accepted',
                     description = 'Order accepted! Preparing containers for delivery...',
                     type = 'success',
-                    duration = 10000
+                    duration = 10000,
+                    position = Config.UI and Config.UI.notificationPosition or "top",
+                    markdown = Config.UI and Config.UI.enableMarkdown or false
                 })
             else
                 TriggerClientEvent('ox_lib:notify', workerId, {
                     title = 'Error',
                     description = 'Failed to process order.',
                     type = 'error',
-                    duration = 10000
+                    duration = 10000,
+                    position = Config.UI and Config.UI.notificationPosition or "top",
+                    markdown = Config.UI and Config.UI.enableMarkdown or false
                 })
             end
         end)
@@ -332,7 +362,9 @@ AddEventHandler('update:stockWithContainers', function(restaurantId, orders)
             title = 'Error',
             description = 'Invalid delivery data.',
             type = 'error',
-            duration = 10000
+            duration = 10000,
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
         })
         return
     end
@@ -370,7 +402,9 @@ AddEventHandler('update:stockWithContainers', function(restaurantId, orders)
                 title = '📦 Container Delivery Complete',
                 description = 'Containers delivered to restaurant! Restaurant staff can now open containers.',
                 type = 'success',
-                duration = 12000
+                duration = 12000,
+                position = Config.UI and Config.UI.notificationPosition or "top",
+                markdown = Config.UI and Config.UI.enableMarkdown or false
             })
             
             -- Calculate enhanced delivery rewards
@@ -415,7 +449,9 @@ AddEventHandler('update:stockWithContainers', function(restaurantId, orders)
                 title = 'Error',
                 description = 'Failed to complete delivery.',
                 type = 'error',
-                duration = 10000
+                duration = 10000,
+                position = Config.UI and Config.UI.notificationPosition or "top",
+                markdown = Config.UI and Config.UI.enableMarkdown or false
             })
         end
     end)
@@ -449,7 +485,7 @@ RegisterNetEvent('warehouse:getPendingOrdersWithContainers')
 AddEventHandler('warehouse:getPendingOrdersWithContainers', function()
     local playerId = source
     
-    if not hasWarehouseAccess or not hasWarehouseAccess(playerId) then
+    if not hasWarehouseAccess(playerId) then
         return
     end
     
@@ -460,13 +496,14 @@ AddEventHandler('warehouse:getPendingOrdersWithContainers', function()
         local itemNames = exports.ox_inventory:Items() or {}
         
         for _, order in ipairs(results) do
-            local restaurantJob = Config.Restaurants[order.restaurant_id] and Config.Restaurants[order.restaurant_id].job
+            local restaurantJob = Config.Restaurants and Config.Restaurants[order.restaurant_id] and 
+                                Config.Restaurants[order.restaurant_id].job
             if restaurantJob then
                 local itemKey = order.ingredient:lower()
                 local item = nil
                 
                 -- Find item in restaurant config
-                if Config.Items[restaurantJob] then
+                if Config.Items and Config.Items[restaurantJob] then
                     for category, categoryItems in pairs(Config.Items[restaurantJob]) do
                         if categoryItems[itemKey] then
                             item = categoryItems[itemKey]
@@ -507,9 +544,12 @@ AddEventHandler('warehouse:getPendingOrdersWithContainers', function()
                     
                     -- Calculate container requirements if container system enabled
                     if isContainerSystemEnabled() then
-                        local containersNeeded = math.ceil(order.quantity / Config.DynamicContainers.system.maxItemsPerContainer)
+                        local maxItems = Config.DynamicContainers and Config.DynamicContainers.system and 
+                                       Config.DynamicContainers.system.maxItemsPerContainer or 12
+                        local containersNeeded = math.ceil(order.quantity / maxItems)
                         local containerType = determineOptimalContainer(itemKey, order.quantity)
-                        local containerConfig = Config.DynamicContainers.containerTypes[containerType]
+                        local containerConfig = Config.DynamicContainers and Config.DynamicContainers.containerTypes and 
+                                              Config.DynamicContainers.containerTypes[containerType]
                         local containerCost = containerConfig and containerConfig.cost or 15
                         
                         ordersByGroup[orderGroupId].containerInfo.totalContainers = 
@@ -566,5 +606,6 @@ end)
 exports('processWarehouseOrderWithContainers', processWarehouseOrderWithContainers)
 exports('determineOptimalContainer', determineOptimalContainer)
 exports('isContainerSystemEnabled', isContainerSystemEnabled)
+exports('hasWarehouseAccess', hasWarehouseAccess)
 
 print("[WAREHOUSE CONTAINERS] Warehouse container integration loaded successfully!")

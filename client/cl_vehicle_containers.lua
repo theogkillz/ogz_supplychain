@@ -1,548 +1,458 @@
 -- ============================================
--- CLIENT VEHICLE SYSTEM WITH CONTAINER INTEGRATION
--- Enhanced vehicle spawning and delivery system
+-- VEHICLE CONTAINER SYSTEM - CLIENT LOGIC
+-- Container loading and quality tracking during delivery
 -- ============================================
 
 local QBCore = exports['qb-core']:GetCoreObject()
+local lib = exports['ox_lib']
 
--- Client state
-local currentDeliveryVehicle = nil
-local currentDeliveryData = nil
-local deliveryBlip = nil
-local vehicleBlip = nil
-local containerTrackingBlips = {}
-local deliveryStartTime = nil
-local containerQualityThread = nil
+-- Client state management
+local currentDeliveryData = {
+    vehicle = nil,
+    containers = {},
+    containerStates = {},
+    handlingScore = 100,
+    temperatureBreaches = 0,
+    restaurantId = nil,
+    qualityMonitoringActive = false
+}
 
--- ============================================
--- CONTAINER-ENHANCED VEHICLE SPAWNING
--- ============================================
+local deliveryBlips = {}
+local deliveryRoute = nil
+local qualityMonitoringThread = nil
 
--- Spawn delivery vehicle with container support
-RegisterNetEvent('warehouse:spawnVehiclesWithContainers')
-AddEventHandler('warehouse:spawnVehiclesWithContainers', function(restaurantId, orders, containers)
+-- Show quality warning (MUST BE FIRST - called by others)
+local function showQualityWarning(message)
+    lib.notify({
+        title = '⚠️ Quality Warning',
+        description = message,
+        type = 'warning',
+        duration = 6000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
+    })
+end
+
+-- Check if vehicle is on fire (MUST BE SECOND - called by others)
+local function IsVehicleOnFire(vehicle)
+    if not DoesEntityExist(vehicle) then return false end
+    return IsEntityOnFire(vehicle)
+end
+
+-- Show container quality alert (MUST BE THIRD - called by others)
+local function showContainerQualityAlert(message)
+    lib.notify({
+        title = '📦 Container Alert',
+        description = message,
+        type = 'error',
+        duration = 8000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
+    })
+end
+
+-- Check driving behavior and update quality (NOW SAFE - dependencies above)
+local function checkDrivingBehavior(vehicle)
+    if not DoesEntityExist(vehicle) or not currentDeliveryData then return end
+    
     local playerPed = PlayerPedId()
-    local playerCoords = GetEntityCoords(playerPed)
+    local currentVehicle = GetVehiclePedIsIn(playerPed, false)
     
-    -- Enhanced spawn location finding
-    local spawnCoords = findOptimalSpawnLocation(playerCoords)
-    if not spawnCoords then
-        lib.notify({
-            title = 'Spawn Error',
-            description = 'Could not find suitable vehicle spawn location',
-            type = 'error',
-            duration = 8000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
-        })
-        return
-    end
+    if currentVehicle ~= vehicle then return end
     
-    -- Determine vehicle type based on order size
-    local totalBoxes = calculateTotalBoxes(orders, containers)
-    local vehicleModel = determineVehicleModel(totalBoxes, containers)
+    local speed = GetEntitySpeed(vehicle) * 3.6 -- Convert to km/h
+    local maxSpeed = GetVehicleMaxSpeed(vehicle) * 3.6
+    local speedPercentage = speed / maxSpeed
     
-    -- Load vehicle model
-    lib.requestModel(vehicleModel, 10000)
-    
-    -- Spawn vehicle
-    currentDeliveryVehicle = CreateVehicle(vehicleModel, spawnCoords.x, spawnCoords.y, spawnCoords.z, spawnCoords.w, true, false)
-    
-    if not DoesEntityExist(currentDeliveryVehicle) then
-        lib.notify({
-            title = 'Vehicle Spawn Failed',
-            description = 'Failed to spawn delivery vehicle',
-            type = 'error',
-            duration = 8000,
-            position = Config.UI.notificationPosition,
-            markdown = Config.UI.enableMarkdown
-        })
-        return
-    end
-    
-    -- Configure vehicle
-    setupDeliveryVehicle(currentDeliveryVehicle, vehicleModel)
-    
-    -- Set up delivery data
-    currentDeliveryData = {
-        restaurantId = restaurantId,
-        orders = orders,
-        containers = containers or {},
-        totalBoxes = totalBoxes,
-        vehicleModel = vehicleModel,
-        startTime = GetGameTimer(),
-        qualityChecks = {},
-        temperatureBreaches = 0,
-        handlingScore = 100
-    }
-    
-    -- Create vehicle blip
-    createVehicleBlip(currentDeliveryVehicle)
-    
-    -- Set up container monitoring if containers are used
-    if containers and #containers > 0 then
-        setupContainerMonitoring(containers)
-        startContainerQualityTracking()
-    end
-    
-    -- Show loading instructions
-    showLoadingInstructions(totalBoxes, containers)
-    
-    -- Start loading process
-    startVehicleLoading()
-end)
-
--- ============================================
--- VEHICLE CONFIGURATION AND SETUP
--- ============================================
-
--- Find optimal spawn location for delivery vehicle
-local function findOptimalSpawnLocation(playerCoords)
-    local spawnPoints = {
-        vector4(-1180.0, -2008.0, 13.2, 135.0), -- Warehouse 1
-        vector4(-1190.0, -2018.0, 13.2, 135.0), -- Warehouse 2
-        vector4(-1200.0, -2028.0, 13.2, 135.0), -- Warehouse 3
-    }
-    
-    for _, point in ipairs(spawnPoints) do
-        if IsAreaClear(point.x, point.y, point.z, 5.0, true, false, false, false) then
-            return point
+    -- Check for harsh driving
+    if speedPercentage > 0.8 then
+        if currentDeliveryData.handlingScore then
+            currentDeliveryData.handlingScore = math.max(0, currentDeliveryData.handlingScore - 0.5)
         end
     end
     
-    -- Fallback: find clear area near player
-    local found, coords = GetSafeCoordForPed(playerCoords.x + 10, playerCoords.y + 10, playerCoords.z, true, 16)
-    if found then
-        return vector4(coords.x, coords.y, coords.z, 0.0)
+    -- Check for sudden stops/accelerations
+    local acceleration = GetVehicleAcceleration(vehicle)
+    if math.abs(acceleration) > 5.0 then
+        if currentDeliveryData.temperatureBreaches then
+            currentDeliveryData.temperatureBreaches = currentDeliveryData.temperatureBreaches + 1
+        end
+        
+        if currentDeliveryData.temperatureBreaches and currentDeliveryData.temperatureBreaches > 3 then
+            showQualityWarning("Rough handling detected! Container quality may be affected.")
+        end
     end
-    
-    return nil
 end
 
--- Determine vehicle model based on delivery size and container types
-local function determineVehicleModel(totalBoxes, containers)
-    local vehicleConfigs = {
-        small = { model = "boxville", capacity = 20, name = "Small Delivery Van" },
-        medium = { model = "boxville2", capacity = 40, name = "Medium Delivery Truck" },
-        large = { model = "boxville3", capacity = 60, name = "Large Delivery Truck" },
-        refrigerated = { model = "pounder", capacity = 50, name = "Refrigerated Truck" }
-    }
+-- Check vehicle condition (NOW SAFE - dependencies above)
+local function checkVehicleCondition(vehicle)
+    if not DoesEntityExist(vehicle) or not currentDeliveryData then return end
     
-    -- Check if refrigerated vehicle needed
-    local needsRefrigeration = false
-    if containers then
-        for _, container in ipairs(containers) do
-            if container.containerType and Config.DynamicContainers.containerTypes[container.containerType] then
-                local config = Config.DynamicContainers.containerTypes[container.containerType]
-                if config.requiresRefrigeration or config.temperatureControlled then
-                    needsRefrigeration = true
-                    break
+    local engineHealth = GetVehicleEngineHealth(vehicle)
+    local bodyHealth = GetVehicleBodyHealth(vehicle)
+    
+    -- Check for vehicle damage
+    if engineHealth < 800 or bodyHealth < 800 then
+        if currentDeliveryData.temperatureBreaches then
+            currentDeliveryData.temperatureBreaches = currentDeliveryData.temperatureBreaches + 1
+        end
+    end
+    
+    -- Check for fire
+    if IsVehicleOnFire(vehicle) then
+        if currentDeliveryData.containers then
+            for _, container in ipairs(currentDeliveryData.containers) do
+                if currentDeliveryData.containerStates and currentDeliveryData.containerStates[container.container_id] then
+                    currentDeliveryData.containerStates[container.container_id].quality = 0
                 end
             end
         end
-    end
-    
-    if needsRefrigeration then
-        return vehicleConfigs.refrigerated.model
-    elseif totalBoxes <= 20 then
-        return vehicleConfigs.small.model
-    elseif totalBoxes <= 40 then
-        return vehicleConfigs.medium.model
-    else
-        return vehicleConfigs.large.model
+        
+        showContainerQualityAlert("🚨 Vehicle fire! All containers destroyed!")
     end
 end
 
--- Calculate total boxes from orders and containers
+-- Update container quality based on conditions (NOW SAFE - dependencies above)
+local function updateContainerQuality()
+    if not currentDeliveryData or not currentDeliveryData.containerStates then return end
+    
+    for containerId, state in pairs(currentDeliveryData.containerStates) do
+        local qualityLoss = 0
+        
+        -- Time-based degradation
+        local currentTime = GetGameTimer()
+        local timeSinceLastCheck = currentTime - state.lastCheck
+        local minutesPassed = timeSinceLastCheck / (1000 * 60)
+        
+        qualityLoss = qualityLoss + (minutesPassed * 0.1) -- 0.1% per minute
+        
+        -- Handling-based degradation
+        if currentDeliveryData.handlingScore and currentDeliveryData.handlingScore < 80 then
+            qualityLoss = qualityLoss + 0.5
+        end
+        
+        -- Temperature breach penalties
+        if currentDeliveryData.temperatureBreaches and currentDeliveryData.temperatureBreaches > 0 then
+            qualityLoss = qualityLoss + (currentDeliveryData.temperatureBreaches * 0.2)
+        end
+        
+        -- Apply quality loss
+        state.quality = math.max(0, state.quality - qualityLoss)
+        state.lastCheck = currentTime
+        
+        -- Show warnings for low quality
+        if state.quality < 30 and state.quality > 25 then
+            showContainerQualityAlert(string.format("Container %s quality critical: %.1f%%", containerId, state.quality))
+        elseif state.quality < 50 and state.quality > 45 then
+            showContainerQualityAlert(string.format("Container %s quality low: %.1f%%", containerId, state.quality))
+        end
+    end
+end
+
+-- Update container quality based on conditions
+local function updateContainerQuality()
+    if not currentDeliveryData or not currentDeliveryData.containerStates then return end
+    
+    for containerId, state in pairs(currentDeliveryData.containerStates) do
+        local qualityLoss = 0
+        
+        -- Time-based degradation
+        local currentTime = GetGameTimer()
+        local timeSinceLastCheck = currentTime - state.lastCheck
+        local minutesPassed = timeSinceLastCheck / (1000 * 60)
+        
+        qualityLoss = qualityLoss + (minutesPassed * 0.1) -- 0.1% per minute
+        
+        -- Handling-based degradation
+        if currentDeliveryData.handlingScore and currentDeliveryData.handlingScore < 80 then
+            qualityLoss = qualityLoss + 0.5
+        end
+        
+        -- Temperature breach penalties
+        if currentDeliveryData.temperatureBreaches and currentDeliveryData.temperatureBreaches > 0 then
+            qualityLoss = qualityLoss + (currentDeliveryData.temperatureBreaches * 0.2)
+        end
+        
+        -- Apply quality loss
+        state.quality = math.max(0, state.quality - qualityLoss)
+        state.lastCheck = currentTime
+        
+        -- Show warnings for low quality
+        if state.quality < 30 and state.quality > 25 then
+            showContainerQualityAlert(string.format("Container %s quality critical: %.1f%%", containerId, state.quality))
+        elseif state.quality < 50 and state.quality > 45 then
+            showContainerQualityAlert(string.format("Container %s quality low: %.1f%%", containerId, state.quality))
+        end
+    end
+end
+
+-- ============================================
+-- MISSING FUNCTION DEFINITIONS
+-- ============================================
+
+-- Find optimal spawn location for vehicle
+local function findOptimalSpawnLocation(playerCoords)
+    local spawnOffset = 5.0
+    local testCoords = {
+        vector4(playerCoords.x + spawnOffset, playerCoords.y, playerCoords.z, 0.0),
+        vector4(playerCoords.x - spawnOffset, playerCoords.y, playerCoords.z, 0.0),
+        vector4(playerCoords.x, playerCoords.y + spawnOffset, playerCoords.z, 0.0),
+        vector4(playerCoords.x, playerCoords.y - spawnOffset, playerCoords.z, 0.0)
+    }
+    
+    for _, coords in ipairs(testCoords) do
+        local groundZ = coords.z
+        local foundGround, groundCoords = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z + 5.0, false)
+        
+        if foundGround then
+            return vector4(coords.x, coords.y, groundCoords, 0.0)
+        end
+    end
+    
+    return vector4(playerCoords.x + spawnOffset, playerCoords.y, playerCoords.z, 0.0)
+end
+
+-- Calculate total boxes needed for orders
 local function calculateTotalBoxes(orders, containers)
-    if containers and #containers > 0 then
-        return #containers -- One container = one box
-    end
-    
     local totalItems = 0
-    for _, order in ipairs(orders) do
-        totalItems = totalItems + order.quantity
+    
+    if orders then
+        for _, order in ipairs(orders) do
+            totalItems = totalItems + (order.quantity or 0)
+        end
     end
     
-    local itemsPerBox = 12 -- Default container capacity
-    return math.ceil(totalItems / itemsPerBox)
+    if containers then
+        for _, container in ipairs(containers) do
+            totalItems = totalItems + (container.contents_amount or 0)
+        end
+    end
+    
+    return math.ceil(totalItems / 12), totalItems
 end
 
--- Setup delivery vehicle properties
-local function setupDeliveryVehicle(vehicle, model)
-    -- Set vehicle properties
-    SetVehicleEngineOn(vehicle, true, true, false)
-    SetVehicleOnGroundProperly(vehicle)
+-- Determine appropriate vehicle model based on load
+local function determineVehicleModel(totalBoxes, containers, achievementTier)
+    local vehicleModel = "speedo"
+    
+    if totalBoxes <= 2 then
+        vehicleModel = "pony"
+    elseif totalBoxes <= 5 then
+        vehicleModel = "speedo"
+    elseif totalBoxes <= 10 then
+        vehicleModel = "mule"
+    else
+        vehicleModel = "mule3"
+    end
+    
+    return vehicleModel
+end
+
+-- Setup delivery vehicle with standard configurations
+local function setupDeliveryVehicle(vehicle, vehicleModel)
+    if not DoesEntityExist(vehicle) then return end
+    
     SetEntityAsMissionEntity(vehicle, true, true)
-    
-    -- Fuel and condition
-    exports['cdn-fuel']:SetFuel(vehicle, 100.0) -- Full fuel
-    SetVehicleEngineHealth(vehicle, 1000.0)
-    SetVehicleBodyHealth(vehicle, 1000.0)
-    
-    -- Lock vehicle to player
-    local playerPed = PlayerPedId()
     SetVehicleHasBeenOwnedByPlayer(vehicle, true)
-    SetEntityAsMissionEntity(vehicle, true, true)
+    SetVehicleNeedsToBeHotwired(vehicle, false)
+    SetVehRadioStation(vehicle, "OFF")
+    SetVehicleEngineOn(vehicle, true, true, false)
     
-    -- Give keys to player (if using key system)
+    if exports['LegacyFuel'] then
+        exports['LegacyFuel']:SetFuel(vehicle, 100.0)
+    end
+    
     if exports['qb-vehiclekeys'] then
         exports['qb-vehiclekeys']:GiveKeys(GetVehicleNumberPlateText(vehicle))
     end
-    
-    -- Add delivery vehicle identifier
-    SetVehicleNumberPlateText(vehicle, "HURST" .. math.random(10, 99))
-    
-    -- Visual modifications for delivery vehicles
-    if model == "pounder" then
-        -- Refrigerated truck setup
-        SetVehicleLivery(vehicle, 0) -- Delivery company livery
-        SetVehicleColours(vehicle, 0, 0) -- White color scheme
-    else
-        -- Standard delivery van setup
-        SetVehicleColours(vehicle, 0, 0) -- White color scheme
-    end
 end
 
--- Create vehicle tracking blip
+-- Create vehicle blip for delivery
 local function createVehicleBlip(vehicle)
-    if vehicleBlip then
-        RemoveBlip(vehicleBlip)
-    end
+    if not DoesEntityExist(vehicle) then return nil end
     
-    vehicleBlip = AddBlipForEntity(vehicle)
-    SetBlipSprite(vehicleBlip, 67) -- Delivery truck icon
-    SetBlipColour(vehicleBlip, 5) -- Yellow
-    SetBlipScale(vehicleBlip, 0.8)
-    SetBlipAsShortRange(vehicleBlip, true)
+    local blip = AddBlipForEntity(vehicle)
+    SetBlipSprite(blip, 477)
+    SetBlipDisplay(blip, 4)
+    SetBlipScale(blip, 0.8)
+    SetBlipColour(blip, 5)
+    SetBlipAsShortRange(blip, true)
     BeginTextCommandSetBlipName("STRING")
-    AddTextComponentString("📦 Delivery Vehicle")
-    EndTextCommandSetBlipName(vehicleBlip)
+    AddTextComponentString("Delivery Vehicle")
+    EndTextCommandSetBlipName(blip)
+    
+    return blip
 end
 
--- ============================================
--- CONTAINER MONITORING SYSTEM
--- ============================================
-
--- Setup container monitoring for quality tracking
-local function setupContainerMonitoring(containers)
+-- Setup container monitoring system
+local function setupContainerMonitoring(vehicle, containers)
+    if not currentDeliveryData then return end
+    
+    currentDeliveryData.vehicle = vehicle
+    currentDeliveryData.containers = containers or {}
     currentDeliveryData.containerStates = {}
     
-    for _, container in ipairs(containers) do
-        currentDeliveryData.containerStates[container.containerId] = {
-            initialQuality = 100.0, -- Assume 100% when loaded
-            currentQuality = 100.0,
-            temperatureBreach = false,
-            lastQualityCheck = GetGameTimer(),
-            degradationEvents = {}
+    for _, container in ipairs(currentDeliveryData.containers) do
+        currentDeliveryData.containerStates[container.container_id] = {
+            quality = container.quality_level or 100,
+            temperature = 20, -- Celsius
+            lastCheck = GetGameTimer()
         }
     end
 end
 
--- Start container quality tracking thread
-local function startContainerQualityTracking()
-    if containerQualityThread then return end
+-- Start container quality tracking
+local function startContainerQualityTracking(vehicle)
+    if qualityMonitoringThread then return end
     
-    containerQualityThread = true
+    currentDeliveryData.qualityMonitoringActive = true
     
-    Citizen.CreateThread(function()
-        while containerQualityThread and currentDeliveryVehicle and DoesEntityExist(currentDeliveryVehicle) do
-            local playerPed = PlayerPedId()
-            local vehicle = GetVehiclePedIsIn(playerPed, false)
-            
-            if vehicle == currentDeliveryVehicle then
-                -- Check driving behavior for container quality
-                checkDrivingBehavior(vehicle)
-                
-                -- Check vehicle condition
-                checkVehicleCondition(vehicle)
-                
-                -- Update container quality
-                updateContainerQuality()
-            end
+    qualityMonitoringThread = Citizen.CreateThread(function()
+        while currentDeliveryData.qualityMonitoringActive and DoesEntityExist(vehicle) do
+            checkDrivingBehavior(vehicle)
+            checkVehicleCondition(vehicle)
+            updateContainerQuality()
             
             Citizen.Wait(5000) -- Check every 5 seconds
         end
         
-        containerQualityThread = nil
+        qualityMonitoringThread = nil
     end)
 end
 
--- Check driving behavior affecting container quality
-local function checkDrivingBehavior(vehicle)
-    local speed = GetEntitySpeed(vehicle) * 2.237 -- Convert to MPH
-    local acceleration = GetVehicleAcceleration(vehicle)
-    local isOnFire = IsVehicleOnFire(vehicle)
-    local hasCollided = HasEntityCollidedWithAnything(vehicle)
-    
-    local qualityImpact = 0
-    local degradationReason = nil
-    
-    -- Speed penalty
-    if speed > 80 then
-        qualityImpact = qualityImpact - 0.5 -- High speed reduces quality
-        degradationReason = "excessive_speed"
-    end
-    
-    -- Acceleration/braking penalty
-    if math.abs(acceleration) > 5.0 then
-        qualityImpact = qualityImpact - 1.0 -- Harsh acceleration/braking
-        degradationReason = "rough_driving"
-    end
-    
-    -- Collision penalty
-    if hasCollided then
-        qualityImpact = qualityImpact - 5.0 -- Major impact
-        degradationReason = "collision"
-        currentDeliveryData.handlingScore = math.max(0, currentDeliveryData.handlingScore - 10)
-    end
-    
-    -- Fire penalty (critical)
-    if isOnFire then
-        qualityImpact = qualityImpact - 25.0 -- Massive quality loss
-        degradationReason = "fire_damage"
-        currentDeliveryData.temperatureBreaches = currentDeliveryData.temperatureBreaches + 1
-    end
-    
-    -- Apply quality impact if any
-    if qualityImpact < 0 and currentDeliveryData.containerStates then
-        for containerId, state in pairs(currentDeliveryData.containerStates) do
-            state.currentQuality = math.max(0, state.currentQuality + qualityImpact)
-            
-            if degradationReason then
-                table.insert(state.degradationEvents, {
-                    reason = degradationReason,
-                    impact = math.abs(qualityImpact),
-                    timestamp = GetGameTimer()
-                })
-            end
-        end
-        
-        -- Show quality warning if significant impact
-        if qualityImpact <= -5.0 then
-            showQualityWarning(degradationReason, math.abs(qualityImpact))
-        end
-    end
-end
-
--- Check vehicle condition for container integrity
-local function checkVehicleCondition(vehicle)
-    local engineHealth = GetVehicleEngineHealth(vehicle)
-    local bodyHealth = GetVehicleBodyHealth(vehicle)
-    
-    -- Engine issues affect refrigerated containers
-    if engineHealth < 500 and currentDeliveryData.containers then
-        for _, container in ipairs(currentDeliveryData.containers) do
-            if container.containerType then
-                local config = Config.DynamicContainers.containerTypes[container.containerType]
-                if config and config.temperatureControlled then
-                    -- Temperature control failure
-                    local state = currentDeliveryData.containerStates[container.containerId]
-                    if state then
-                        state.temperatureBreach = true
-                        state.currentQuality = math.max(0, state.currentQuality - 2.0)
-                        
-                        table.insert(state.degradationEvents, {
-                            reason = "temperature_control_failure",
-                            impact = 2.0,
-                            timestamp = GetGameTimer()
-                        })
-                    end
-                end
-            end
-        end
-        
-        currentDeliveryData.temperatureBreaches = currentDeliveryData.temperatureBreaches + 1
-    end
-    
-    -- Body damage affects container security
-    if bodyHealth < 300 then
-        if currentDeliveryData.containerStates then
-            for containerId, state in pairs(currentDeliveryData.containerStates) do
-                state.currentQuality = math.max(0, state.currentQuality - 1.0)
-                
-                table.insert(state.degradationEvents, {
-                    reason = "vehicle_damage",
-                    impact = 1.0,
-                    timestamp = GetGameTimer()
-                })
-            end
-        end
-    end
-end
-
--- Update container quality based on time and conditions
-local function updateContainerQuality()
-    if not currentDeliveryData.containerStates then return end
-    
-    local currentTime = GetGameTimer()
-    
-    for containerId, state in pairs(currentDeliveryData.containerStates) do
-        local timeSinceLastCheck = currentTime - state.lastQualityCheck
-        local timeBasedDegradation = (timeSinceLastCheck / 1000) * 0.01 -- 0.01% per second
-        
-        state.currentQuality = math.max(0, state.currentQuality - timeBasedDegradation)
-        state.lastQualityCheck = currentTime
-        
-        -- Check for quality alerts
-        if state.currentQuality <= 30 and state.currentQuality > 25 then
-            showContainerQualityAlert(containerId, state.currentQuality, 'warning')
-        elseif state.currentQuality <= 25 then
-            showContainerQualityAlert(containerId, state.currentQuality, 'critical')
-        end
-    end
-end
-
--- Show quality warning to player
-local function showQualityWarning(reason, impact)
-    local reasonMessages = {
-        excessive_speed = "⚡ Driving too fast!",
-        rough_driving = "🚗 Smooth driving protects containers!",
-        collision = "💥 Collision detected!",
-        fire_damage = "🔥 FIRE! Containers critically damaged!",
-        temperature_control_failure = "❄️ Refrigeration system failure!"
-    }
-    
-    local message = reasonMessages[reason] or "Container quality affected!"
-    
-    lib.notify({
-        title = '📦 Container Quality Warning',
-        description = string.format('%s\n⚠️ Quality reduced by %.1f%%', message, impact),
-        type = impact >= 10 and 'error' or 'warning',
-        duration = 5000,
-        position = Config.UI.notificationPosition,
-        markdown = Config.UI.enableMarkdown
-    })
-    
-    -- Play warning sound
-    PlaySoundFrontend(-1, "CHECKPOINT_MISSED", "HUD_MINI_GAME_SOUNDSET", true)
-end
-
--- Show container quality alert
-local function showContainerQualityAlert(containerId, quality, alertType)
-    local qualityIcon = quality <= 25 and "🚨" or "⚠️"
-    local qualityLabel = quality <= 25 and "CRITICAL" or "WARNING"
-    
-    lib.notify({
-        title = string.format('%s Container Quality %s', qualityIcon, qualityLabel),
-        description = string.format('Container %s\nQuality: **%.1f%%**\nTake care with remaining delivery!', 
-            containerId:sub(-6), quality),
-        type = alertType,
-        duration = 8000,
-        position = Config.UI.notificationPosition,
-        markdown = Config.UI.enableMarkdown
-    })
-end
-
--- ============================================
--- LOADING AND DELIVERY PROCESS
--- ============================================
-
 -- Show loading instructions to player
-local function showLoadingInstructions(totalBoxes, containers)
-    local containerText = ""
-    if containers and #containers > 0 then
-        local containerTypes = {}
-        for _, container in ipairs(containers) do
-            local containerType = container.containerType
-            if not containerTypes[containerType] then
-                containerTypes[containerType] = 0
-            end
-            containerTypes[containerType] = containerTypes[containerType] + 1
-        end
-        
-        local typesList = {}
-        for containerType, count in pairs(containerTypes) do
-            local config = Config.DynamicContainers.containerTypes[containerType]
-            local name = config and config.name or containerType
-            table.insert(typesList, string.format("%d %s", count, name))
-        end
-        
-        containerText = string.format("\n📦 **Container Types:**\n%s", table.concat(typesList, "\n"))
-    end
-    
+local function showLoadingInstructions(containerCount)
     lib.notify({
-        title = '📦 Loading Instructions',
-        description = string.format(
-            '🚛 **Delivery Vehicle Ready**\n\n📦 Total Boxes: **%d**%s\n\n🎯 **Next Steps:**\n• Get in the vehicle\n• Drive carefully to preserve quality\n• Deliver to restaurant',
-            totalBoxes, containerText
-        ),
+        title = '📦 Container Loading',
+        description = string.format('Loading %d containers into vehicle. Drive carefully to maintain quality!', containerCount),
         type = 'info',
-        duration = 15000,
-        position = Config.UI.notificationPosition,
-        markdown = Config.UI.enableMarkdown
+        duration = 8000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
     })
 end
 
 -- Start vehicle loading process
-local function startVehicleLoading()
-    deliveryStartTime = GetGameTimer()
+local function startVehicleLoading(vehicle, containers)
+    local playerPed = PlayerPedId()
     
-    -- Create delivery route blip
-    createDeliveryBlip(currentDeliveryData.restaurantId)
+    lib.progressBar({
+        duration = 3000 + (#containers * 1000), -- 3 seconds + 1 second per container
+        position = 'bottom',
+        label = 'Loading containers...',
+        useWhileDead = false,
+        canCancel = false,
+        disable = {
+            move = true,
+            car = true,
+            combat = true
+        }
+    })
     
-    -- Set GPS route
-    setDeliveryRoute(currentDeliveryData.restaurantId)
-    
-    -- Start delivery tracking
-    startDeliveryTracking()
+    setupContainerMonitoring(vehicle, containers)
+    showLoadingInstructions(#containers)
+    startContainerQualityTracking(vehicle)
 end
 
--- Create delivery destination blip
-local function createDeliveryBlip(restaurantId)
-    local restaurant = Config.Restaurants[restaurantId]
-    if not restaurant then return end
+-- Check if area is clear for vehicle spawn
+local function IsAreaClear(coords, radius)
+    local vehicles = GetGamePool('CVehicle')
     
-    if deliveryBlip then
-        RemoveBlip(deliveryBlip)
+    for _, vehicle in ipairs(vehicles) do
+        if DoesEntityExist(vehicle) then
+            local vehicleCoords = GetEntityCoords(vehicle)
+            local distance = #(coords - vehicleCoords)
+            
+            if distance < radius then
+                return false
+            end
+        end
     end
     
-    deliveryBlip = AddBlipForCoord(restaurant.coords.x, restaurant.coords.y, restaurant.coords.z)
-    SetBlipSprite(deliveryBlip, 1) -- Destination marker
-    SetBlipColour(deliveryBlip, 2) -- Green
-    SetBlipScale(deliveryBlip, 1.0)
-    SetBlipRoute(deliveryBlip, true)
-    SetBlipRouteColour(deliveryBlip, 2)
-    BeginTextCommandSetBlipName("STRING")
-    AddTextComponentString("🎯 Delivery Destination: " .. restaurant.name)
-    EndTextCommandSetBlipName(deliveryBlip)
+    return true
 end
 
--- Set GPS route to restaurant
-local function setDeliveryRoute(restaurantId)
-    local restaurant = Config.Restaurants[restaurantId]
-    if not restaurant then return end
-    
-    SetNewWaypoint(restaurant.coords.x, restaurant.coords.y)
-    
+-- Show quality warning
+local function showQualityWarning(message)
     lib.notify({
-        title = '🗺️ Route Set',
-        description = string.format('GPS route set to **%s**\nFollow the yellow line on your map', restaurant.name),
-        type = 'info',
-        duration = 8000,
-        position = Config.UI.notificationPosition,
-        markdown = Config.UI.enableMarkdown
+        title = '⚠️ Quality Warning',
+        description = message,
+        type = 'warning',
+        duration = 6000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
     })
 end
 
--- Start delivery tracking thread
-local function startDeliveryTracking()
+-- Show container quality alert
+local function showContainerQualityAlert(message)
+    lib.notify({
+        title = '📦 Container Alert',
+        description = message,
+        type = 'error',
+        duration = 8000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
+    })
+end
+
+-- Check if vehicle is on fire
+local function IsVehicleOnFire(vehicle)
+    if not DoesEntityExist(vehicle) then return false end
+    return IsEntityOnFire(vehicle)
+end
+
+-- Create delivery blip
+local function createDeliveryBlip(restaurantId)
+    if not Config.Restaurants or not Config.Restaurants[restaurantId] then return nil end
+    
+    local restaurant = Config.Restaurants[restaurantId]
+    local blip = AddBlipForCoord(restaurant.position.x, restaurant.position.y, restaurant.position.z)
+    
+    SetBlipSprite(blip, 478)
+    SetBlipDisplay(blip, 4)
+    SetBlipScale(blip, 1.0)
+    SetBlipColour(blip, 2)
+    SetBlipRoute(blip, true)
+    SetBlipAsShortRange(blip, false)
+    BeginTextCommandSetBlipName("STRING")
+    AddTextComponentString("Delivery Destination")
+    EndTextCommandSetBlipName(blip)
+    
+    return blip
+end
+
+-- Set delivery route
+local function setDeliveryRoute(restaurantId)
+    if not Config.Restaurants or not Config.Restaurants[restaurantId] then return end
+    
+    local restaurant = Config.Restaurants[restaurantId]
+    local blip = createDeliveryBlip(restaurantId)
+    
+    if blip then
+        table.insert(deliveryBlips, blip)
+    end
+    
+    lib.notify({
+        title = '🗺️ Route Set',
+        description = 'Follow the GPS route to ' .. (restaurant.name or 'the restaurant'),
+        type = 'info',
+        duration = 5000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
+    })
+end
+
+-- Start delivery tracking
+local function startDeliveryTracking(vehicle)
     Citizen.CreateThread(function()
-        while currentDeliveryVehicle and DoesEntityExist(currentDeliveryVehicle) and currentDeliveryData do
-            local playerPed = PlayerPedId()
-            local playerCoords = GetEntityCoords(playerPed)
-            local restaurant = Config.Restaurants[currentDeliveryData.restaurantId]
+        local playerPed = PlayerPedId()
+        
+        while currentDeliveryData.qualityMonitoringActive and DoesEntityExist(vehicle) do
+            local currentVehicle = GetVehiclePedIsIn(playerPed, false)
             
-            if restaurant then
-                local distance = #(playerCoords - restaurant.coords)
-                
-                -- Check if player is near delivery location
-                if distance <= 10.0 then
-                    local vehicle = GetVehiclePedIsIn(playerPed, false)
-                    if vehicle == currentDeliveryVehicle then
-                        showDeliveryPrompt()
-                    end
-                end
+            if currentVehicle == vehicle then
+                -- Update GPS and tracking here
             end
             
             Citizen.Wait(1000)
@@ -550,188 +460,217 @@ local function startDeliveryTracking()
     end)
 end
 
--- Show delivery completion prompt
-local function showDeliveryPrompt()
-    lib.showTextUI('[E] Complete Delivery', {
-        position = "top-center",
-        icon = 'truck',
-        style = {
-            borderRadius = 5,
-            backgroundColor = '#48BB78',
-            color = 'white'
-        }
+-- Show delivery prompt
+local function showDeliveryPrompt(restaurantId)
+    lib.notify({
+        title = '📦 Delivery Available',
+        description = 'Press [E] to complete delivery',
+        type = 'info',
+        duration = 5000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
     })
-    
-    Citizen.CreateThread(function()
-        while true do
-            Citizen.Wait(0)
-            
-            if IsControlJustReleased(0, 38) then -- E key
-                lib.hideTextUI()
-                completeDelivery()
-                break
-            end
-            
-            local playerCoords = GetEntityCoords(PlayerPedId())
-            local restaurant = Config.Restaurants[currentDeliveryData.restaurantId]
-            local distance = #(playerCoords - restaurant.coords)
-            
-            if distance > 15.0 then
-                lib.hideTextUI()
-                break
-            end
-        end
-    end)
 end
 
--- Complete delivery process
-local function completeDelivery()
+-- Complete delivery
+local function completeDelivery(restaurantId)
     if not currentDeliveryData then return end
     
-    local deliveryTime = GetGameTimer() - deliveryStartTime
-    local vehicle = currentDeliveryVehicle
+    TriggerServerEvent('containers:completeDelivery', 'delivery_group', restaurantId)
     
-    -- Calculate final quality scores
-    local avgQuality = 100.0
-    local qualityBonus = 0
+    lib.notify({
+        title = '✅ Delivery Complete',
+        description = 'Containers delivered successfully!',
+        type = 'success',
+        duration = 8000,
+        position = Config.UI and Config.UI.notificationPosition or "top",
+        markdown = Config.UI and Config.UI.enableMarkdown or false
+    })
+end
+
+-- Show delivery completion summary
+local function showDeliveryCompletionSummary(qualityData, paymentInfo)
+    local averageQuality = 0
+    local containerCount = 0
     
-    if currentDeliveryData.containerStates then
-        local totalQuality = 0
-        local containerCount = 0
-        
+    if currentDeliveryData and currentDeliveryData.containerStates then
         for _, state in pairs(currentDeliveryData.containerStates) do
-            totalQuality = totalQuality + state.currentQuality
+            averageQuality = averageQuality + state.quality
             containerCount = containerCount + 1
         end
         
         if containerCount > 0 then
-            avgQuality = totalQuality / containerCount
+            averageQuality = averageQuality / containerCount
         end
     end
     
-    -- Calculate quality bonus
-    if avgQuality >= 95 then
-        qualityBonus = 200 -- Excellent quality bonus
-    elseif avgQuality >= 85 then
-        qualityBonus = 100 -- Good quality bonus
-    elseif avgQuality >= 70 then
-        qualityBonus = 50  -- Fair quality bonus
-    end
-    
-    -- Calculate handling bonus
-    local handlingBonus = 0
-    if currentDeliveryData.handlingScore >= 95 then
-        handlingBonus = 150 -- Perfect handling
-    elseif currentDeliveryData.handlingScore >= 85 then
-        handlingBonus = 75  -- Good handling
-    end
-    
-    -- Show completion animation
-    local playerPed = PlayerPedId()
-    TaskPlayAnim(playerPed, "mini@repair", "fixing_a_ped", 8.0, -8.0, 3000, 0, 0, false, false, false)
-    
-    if lib.progressBar({
-        duration = 5000,
-        position = "bottom",
-        label = "Unloading containers...",
-        canCancel = false,
-        disable = { move = true, car = true, combat = true, sprint = true },
-        anim = { dict = "mini@repair", clip = "fixing_a_ped" }
-    }) then
-        
-        -- Trigger server-side delivery completion
-        if currentDeliveryData.containers and #currentDeliveryData.containers > 0 then
-            TriggerServerEvent('containers:completeDelivery', 
-                currentDeliveryData.orders[1].orderGroupId, 
-                currentDeliveryData.restaurantId)
-        end
-        
-        TriggerServerEvent('update:stockWithContainers', currentDeliveryData.restaurantId, currentDeliveryData.orders)
-        
-        -- Show completion summary
-        showDeliveryCompletionSummary(deliveryTime, avgQuality, qualityBonus, handlingBonus)
-        
-        -- Cleanup
-        cleanupDelivery()
-    end
-end
-
--- Show delivery completion summary
-local function showDeliveryCompletionSummary(deliveryTime, avgQuality, qualityBonus, handlingBonus)
-    local minutes = math.floor(deliveryTime / 60000)
-    local seconds = math.floor((deliveryTime % 60000) / 1000)
-    
-    local qualityIcon = avgQuality >= 90 and "⭐" or avgQuality >= 70 and "✅" or "⚠️"
-    local qualityLabel = avgQuality >= 90 and "Excellent" or avgQuality >= 70 and "Good" or "Fair"
-    
-    local bonusText = ""
-    if qualityBonus > 0 or handlingBonus > 0 then
-        bonusText = string.format("\n\n🎉 **Bonuses Earned:**\n%s%s",
-            qualityBonus > 0 and string.format("📦 Quality Bonus: +$%d\n", qualityBonus) or "",
-            handlingBonus > 0 and string.format("🚗 Handling Bonus: +$%d", handlingBonus) or ""
-        )
-    end
-    
-    lib.notify({
-        title = '🎉 Delivery Complete!',
-        description = string.format(
-            '✅ **Delivery Successful**\n\n⏱️ Time: %dm %ds\n%s Avg Quality: **%.1f%%** (%s)\n🚗 Handling Score: **%d/100**%s',
-            minutes, seconds,
-            qualityIcon, avgQuality, qualityLabel,
-            currentDeliveryData.handlingScore,
-            bonusText
+    lib.alertDialog({
+        header = '📦 Delivery Summary',
+        content = string.format(
+            '**Delivery Completed!**\n\n• Containers Delivered: %d\n• Average Quality: %.1f%%\n• Handling Score: %.1f%%\n• Temperature Breaches: %d\n\nGreat work!',
+            containerCount,
+            averageQuality,
+            currentDeliveryData.handlingScore or 100,
+            currentDeliveryData.temperatureBreaches or 0
         ),
-        type = 'success',
-        duration = 15000,
-        position = Config.UI.notificationPosition,
-        markdown = Config.UI.enableMarkdown
+        centered = true,
+        cancel = true
     })
 end
 
--- Cleanup delivery state
+-- Cleanup delivery
 local function cleanupDelivery()
-    -- Stop quality tracking
-    containerQualityThread = nil
+    -- Stop quality monitoring
+    if qualityMonitoringThread then
+        currentDeliveryData.qualityMonitoringActive = false
+        qualityMonitoringThread = nil
+    end
     
     -- Remove blips
-    if deliveryBlip then
-        RemoveBlip(deliveryBlip)
-        deliveryBlip = nil
+    for _, blip in ipairs(deliveryBlips) do
+        if DoesBlipExist(blip) then
+            RemoveBlip(blip)
+        end
     end
+    deliveryBlips = {}
     
-    if vehicleBlip then
-        RemoveBlip(vehicleBlip)
-        vehicleBlip = nil
-    end
-    
-    -- Clean up container blips
-    for _, blip in pairs(containerTrackingBlips) do
-        RemoveBlip(blip)
-    end
-    containerTrackingBlips = {}
-    
-    -- Delete vehicle after delay
-    if currentDeliveryVehicle and DoesEntityExist(currentDeliveryVehicle) then
-        Citizen.SetTimeout(30000, function() -- 30 second delay
-            if DoesEntityExist(currentDeliveryVehicle) then
-                DeleteVehicle(currentDeliveryVehicle)
-            end
-        end)
-    end
-    
-    -- Reset state
-    currentDeliveryVehicle = nil
-    currentDeliveryData = nil
-    deliveryStartTime = nil
+    -- Reset delivery data
+    currentDeliveryData = {
+        vehicle = nil,
+        containers = {},
+        containerStates = {},
+        handlingScore = 100,
+        temperatureBreaches = 0,
+        restaurantId = nil,
+        qualityMonitoringActive = false
+    }
 end
 
 -- ============================================
--- EXPORT FUNCTIONS
+-- EVENT HANDLERS
 -- ============================================
 
--- Export for other scripts
-exports('getCurrentDeliveryVehicle', function() return currentDeliveryVehicle end)
-exports('getCurrentDeliveryData', function() return currentDeliveryData end)
-exports('isOnDelivery', function() return currentDeliveryVehicle ~= nil end)
+-- Load containers with enhanced vehicle system
+RegisterNetEvent("containers:loadVehicleWithContainers")
+AddEventHandler("containers:loadVehicleWithContainers", function(restaurantId, containers)
+    local playerPed = PlayerPedId()
+    local playerCoords = GetEntityCoords(playerPed)
+    
+    -- Determine vehicle based on container count
+    local totalBoxes = calculateTotalBoxes(nil, containers)
+    local vehicleModel = determineVehicleModel(totalBoxes, containers, "standard")
+    
+    -- Find spawn location
+    local spawnCoords = findOptimalSpawnLocation(playerCoords)
+    
+    -- Check if area is clear
+    if not IsAreaClear(vector3(spawnCoords.x, spawnCoords.y, spawnCoords.z), 5.0) then
+        lib.notify({
+            title = 'Spawn Blocked',
+            description = 'Clear the area around you before spawning delivery vehicle',
+            type = 'error',
+            duration = 5000,
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
+        })
+        return
+    end
+    
+    -- Spawn vehicle
+    lib.requestModel(vehicleModel, 10000)
+    local vehicle = CreateVehicle(GetHashKey(vehicleModel), spawnCoords.x, spawnCoords.y, spawnCoords.z, spawnCoords.w, true, false)
+    
+    if DoesEntityExist(vehicle) then
+        setupDeliveryVehicle(vehicle, vehicleModel)
+        
+        -- Create vehicle blip
+        local vehicleBlip = createVehicleBlip(vehicle)
+        if vehicleBlip then
+            table.insert(deliveryBlips, vehicleBlip)
+        end
+        
+        -- Start container loading process
+        startVehicleLoading(vehicle, containers)
+        
+        -- Set delivery route
+        if currentDeliveryData then
+            currentDeliveryData.restaurantId = restaurantId
+        end
+        
+        createDeliveryBlip(restaurantId)
+        setDeliveryRoute(restaurantId)
+        
+        -- Start delivery tracking
+        startDeliveryTracking(vehicle)
+        
+        lib.notify({
+            title = '🚛 Vehicle Ready',
+            description = string.format('Delivery vehicle loaded with %d containers. Follow GPS to destination.', #containers),
+            type = 'success',
+            duration = 10000,
+            position = Config.UI and Config.UI.notificationPosition or "top",
+            markdown = Config.UI and Config.UI.enableMarkdown or false
+        })
+    end
+end)
 
-print("[CONTAINERS] Vehicle integration client loaded successfully!")
+-- Delivery zone detection
+Citizen.CreateThread(function()
+    while true do
+        local playerPed = PlayerPedId()
+        local playerCoords = GetEntityCoords(playerPed)
+        local vehicle = GetVehiclePedIsIn(playerPed, false)
+        
+        if vehicle ~= 0 and currentDeliveryData and currentDeliveryData.qualityMonitoringActive then
+            if currentDeliveryData.restaurantId and Config.Restaurants and Config.Restaurants[currentDeliveryData.restaurantId] then
+                local restaurant = Config.Restaurants[currentDeliveryData.restaurantId]
+                local distance = #(playerCoords - restaurant.position)
+                
+                if distance < 10.0 then
+                    showDeliveryPrompt(currentDeliveryData.restaurantId)
+                    
+                    if IsControlJustPressed(0, 38) then -- E key
+                        completeDelivery(currentDeliveryData.restaurantId)
+                    end
+                end
+            end
+        end
+        
+        Citizen.Wait(500)
+    end
+end)
+
+-- Container delivery completion
+RegisterNetEvent('containers:deliveryCompleted')
+AddEventHandler('containers:deliveryCompleted', function(qualityData, paymentInfo)
+    showDeliveryCompletionSummary(qualityData, paymentInfo)
+    
+    Citizen.SetTimeout(3000, function()
+        cleanupDelivery()
+    end)
+end)
+
+-- Container quality update from server
+RegisterNetEvent('containers:updateQuality')
+AddEventHandler('containers:updateQuality', function(containerId, newQuality)
+    if currentDeliveryData and currentDeliveryData.containerStates and currentDeliveryData.containerStates[containerId] then
+        currentDeliveryData.containerStates[containerId].quality = newQuality
+    end
+end)
+
+-- ============================================
+-- CLEANUP
+-- ============================================
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if resourceName == GetCurrentResourceName() then
+        cleanupDelivery()
+    end
+end)
+
+-- Export functions
+exports('startContainerDelivery', function(restaurantId, containers)
+    TriggerEvent("containers:loadVehicleWithContainers", restaurantId, containers)
+end)
+
+print("[CONTAINERS] Vehicle container system loaded")

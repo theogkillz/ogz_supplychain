@@ -179,6 +179,24 @@ local function startNPCDeliveryJob(source, surplusItem, targetRestaurant)
     local deliveryQuantity = math.min(50, math.floor(surplusItem.quantity * 0.1)) -- 10% of surplus, max 50
     local threshold = surplusItem.threshold
     
+    -- Calculate delivery payment for NPC jobs
+local function calculateDeliveryPayment(quantity, restaurantId)
+    -- Base payment calculation
+    local basePayment = quantity * 5 -- $5 per item base rate
+    
+    -- Restaurant distance multiplier (if available in config)
+    local distanceMultiplier = 1.0
+    if Config.Restaurants and Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].deliveryMultiplier then
+        distanceMultiplier = Config.Restaurants[restaurantId].deliveryMultiplier
+    end
+    
+    -- Apply NPC delivery rate (lower than player deliveries)
+    local npcRate = Config.NPCDeliverySystem and Config.NPCDeliverySystem.paymentRates and 
+                   Config.NPCDeliverySystem.paymentRates.baseRate or 0.7
+    
+    return math.floor(basePayment * distanceMultiplier * npcRate)
+end
+
     -- Calculate NPC payment
     local basePayment = calculateDeliveryPayment(deliveryQuantity, targetRestaurant)
     local npcPayment = math.floor(basePayment * threshold.npcPayMultiplier)
@@ -231,13 +249,7 @@ local function startNPCDeliveryJob(source, surplusItem, targetRestaurant)
         markdown = Config.UI.enableMarkdown
     })
     
-    -- Schedule completion
-    Citizen.SetTimeout(completionTime * 1000, function()
-        completeNPCDelivery(jobId)
-    end)
     
-    return true, jobId
-end
 
 -- Complete NPC delivery
 local function completeNPCDelivery(jobId)
@@ -270,6 +282,14 @@ local function completeNPCDelivery(jobId)
         return
     end
     
+    -- Schedule completion
+    Citizen.SetTimeout(completionTime * 1000, function()
+        completeNPCDelivery(jobId)
+    end)
+    
+    return true, jobId
+end
+
     -- Successful delivery - update restaurant stock
     MySQL.Async.execute([[
         INSERT INTO supply_restaurant_stock (restaurant_id, ingredient, quantity)

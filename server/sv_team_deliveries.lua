@@ -503,3 +503,4 @@ AddEventHandler('team:getAvailableTeams', function()
     
     TriggerClientEvent('team:showAvailableTeams', src, availableTeams)
 end)
+end

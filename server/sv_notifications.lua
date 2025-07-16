@@ -436,6 +436,44 @@ local function sendAchievementNotification(citizenid, newTier, oldTier)
     end
 end
 
+-- Get surplus level information for notifications
+local function getSurplusLevelInfo(surplusLevel)
+    local surplusLevels = {
+        ["critical"] = {
+            icon = "🚨",
+            color = "red", 
+            priority = 5,
+            description = "Critical surplus - immediate action required"
+        },
+        ["high"] = {
+            icon = "⚠️",
+            color = "orange",
+            priority = 4,
+            description = "High surplus detected"
+        },
+        ["moderate"] = {
+            icon = "ℹ️", 
+            color = "yellow",
+            priority = 3,
+            description = "Moderate surplus levels"
+        },
+        ["low"] = {
+            icon = "✅",
+            color = "green",
+            priority = 2,
+            description = "Low surplus - within normal range"
+        },
+        ["normal"] = {
+            icon = "📊",
+            color = "blue",
+            priority = 1,
+            description = "Normal surplus levels"
+        }
+    }
+    
+    return surplusLevels[surplusLevel] or surplusLevels["normal"]
+end
+
 -- NPC surplus notifications
 local function sendSurplusAlert(surplusLevel, ingredientCount)
     if Config.Webhooks.npc_system then

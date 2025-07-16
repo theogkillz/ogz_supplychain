@@ -5,6 +5,9 @@
 
 local QBCore = exports['qb-core']:GetCoreObject()
 
+local calculateQualityMultiplier
+local showContainerRewardNotification
+
 -- ============================================
 -- CONTAINER-ENHANCED REWARD CALCULATION
 -- ============================================
@@ -265,78 +268,7 @@ local function calculateContainerDeliveryRewards(playerId, deliveryData)
         
         finalMultiplier = finalMultiplier * streakMultiplier
         
-        -- ============================================
-        -- 5. FINAL CALCULATION AND PAYMENT
-        -- ============================================
-        
-        local multipliedPay = math.floor(basePay * finalMultiplier)
-        local finalPayout = multipliedPay + totalBonusFlat
-        
-        -- Container delivery bonus cap (higher than standard)
-        local maxContainerPay = Config.EconomyBalance.maximumDeliveryPay * 1.5 -- 50% higher cap for container deliveries
-        finalPayout = math.min(finalPayout, maxContainerPay)
-        
-        -- Award the money
-        xPlayer.Functions.AddMoney('cash', finalPayout, "Container delivery payment with bonuses")
-        
-        -- Enhanced notification for container deliveries
-        showContainerRewardNotification(playerId, {
-            basePay = basePay,
-            finalPayout = finalPayout,
-            bonusBreakdown = bonusBreakdown,
-            finalMultiplier = finalMultiplier,
-            currentStreak = currentStreak,
-            isPerfectDelivery = isPerfectDelivery,
-            boxes = boxes,
-            avgContainerQuality = avgContainerQuality,
-            containerDelivery = true
-        })
-        
-        -- Enhanced logging for container deliveries
-        MySQL.Async.execute([[
-            INSERT INTO supply_delivery_logs (
-                citizenid, order_group_id, restaurant_id, boxes_delivered, 
-                delivery_time, base_pay, bonus_pay, total_pay, 
-                is_perfect_delivery, speed_multiplier, streak_multiplier, 
-                container_delivery, container_quality_avg, container_bonus_amount
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ]], {
-            citizenid,
-            deliveryData.orderGroupId or "unknown",
-            deliveryData.restaurantId or 1,
-            boxes,
-            deliveryData.deliveryTime,
-            basePay,
-            totalBonusFlat,
-            finalPayout,
-            isPerfectDelivery and 1 or 0,
-            speedBonus and speedBonus.multiplier or 1.0,
-            streakMultiplier,
-            1, -- container_delivery flag
-            avgContainerQuality,
-            containerQualityBonus
-        })
-    end)
-end
-
--- Calculate quality multiplier based on container quality
-local function calculateQualityMultiplier(quality)
-    if quality >= 95 then
-        return 1.20 -- 20% bonus for pristine quality
-    elseif quality >= 85 then
-        return 1.15 -- 15% bonus for excellent quality
-    elseif quality >= 70 then
-        return 1.10 -- 10% bonus for good quality
-    elseif quality >= 50 then
-        return 1.00 -- No bonus for fair quality
-    elseif quality >= 30 then
-        return 0.90 -- 10% penalty for poor quality
-    else
-        return 0.70 -- 30% penalty for spoiled quality
-    end
-end
-
--- Enhanced reward notification for container deliveries
+        -- Enhanced reward notification for container deliveries
 local function showContainerRewardNotification(playerId, rewardData)
     local bonusText = ""
     local totalBonusAmount = 0
@@ -435,6 +367,77 @@ local function showContainerRewardNotification(playerId, rewardData)
             position = Config.UI.notificationPosition,
             markdown = Config.UI.enableMarkdown
         })
+    end
+end
+
+        -- ============================================
+        -- 5. FINAL CALCULATION AND PAYMENT
+        -- ============================================
+        
+        local multipliedPay = math.floor(basePay * finalMultiplier)
+        local finalPayout = multipliedPay + totalBonusFlat
+        
+        -- Container delivery bonus cap (higher than standard)
+        local maxContainerPay = Config.EconomyBalance.maximumDeliveryPay * 1.5 -- 50% higher cap for container deliveries
+        finalPayout = math.min(finalPayout, maxContainerPay)
+        
+        -- Award the money
+        xPlayer.Functions.AddMoney('cash', finalPayout, "Container delivery payment with bonuses")
+        
+        -- Enhanced notification for container deliveries
+        showContainerRewardNotification(playerId, {
+            basePay = basePay,
+            finalPayout = finalPayout,
+            bonusBreakdown = bonusBreakdown,
+            finalMultiplier = finalMultiplier,
+            currentStreak = currentStreak,
+            isPerfectDelivery = isPerfectDelivery,
+            boxes = boxes,
+            avgContainerQuality = avgContainerQuality,
+            containerDelivery = true
+        })
+        
+        -- Enhanced logging for container deliveries
+        MySQL.Async.execute([[
+            INSERT INTO supply_delivery_logs (
+                citizenid, order_group_id, restaurant_id, boxes_delivered, 
+                delivery_time, base_pay, bonus_pay, total_pay, 
+                is_perfect_delivery, speed_multiplier, streak_multiplier, 
+                container_delivery, container_quality_avg, container_bonus_amount
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ]], {
+            citizenid,
+            deliveryData.orderGroupId or "unknown",
+            deliveryData.restaurantId or 1,
+            boxes,
+            deliveryData.deliveryTime,
+            basePay,
+            totalBonusFlat,
+            finalPayout,
+            isPerfectDelivery and 1 or 0,
+            speedBonus and speedBonus.multiplier or 1.0,
+            streakMultiplier,
+            1, -- container_delivery flag
+            avgContainerQuality,
+            containerQualityBonus
+        })
+    end)
+end
+
+-- Calculate quality multiplier based on container quality
+calculateQualityMultiplier = function(quality)
+    if quality >= 95 then
+        return 1.20 -- 20% bonus for pristine quality
+    elseif quality >= 85 then
+        return 1.15 -- 15% bonus for excellent quality
+    elseif quality >= 70 then
+        return 1.10 -- 10% bonus for good quality
+    elseif quality >= 50 then
+        return 1.00 -- No bonus for fair quality
+    elseif quality >= 30 then
+        return 0.90 -- 10% penalty for poor quality
+    else
+        return 0.70 -- 30% penalty for spoiled quality
     end
 end
 

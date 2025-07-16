@@ -1,3 +1,27 @@
+local QBCore = exports['qb-core']:GetCoreObject()
+local lib = exports['ox_lib']
+
+-- Helper functions for icons
+local function getAlertIcon(alertLevel)
+    local icons = {
+        critical = "🚨",
+        low = "⚠️", 
+        moderate = "ℹ️",
+        healthy = "✅"
+    }
+    return icons[alertLevel] or "📦"
+end
+
+local function getTrendIcon(trend)
+    local icons = {
+        increasing = "📈",
+        decreasing = "📉",
+        stable = "➡️",
+        unknown = "❓"
+    }
+    return icons[trend] or "➡️"
+end
+
 -- Stock Alerts Dashboard
 RegisterNetEvent("stockalerts:openDashboard")
 AddEventHandler("stockalerts:openDashboard", function()
@@ -194,27 +218,6 @@ AddEventHandler("stockalerts:showSuggestions", function(suggestions)
     })
     lib.showContext("restock_suggestions")
 end)
-
--- Helper functions for icons
-function getAlertIcon(alertLevel)
-    local icons = {
-        critical = "🚨",
-        low = "⚠️", 
-        moderate = "ℹ️",
-        healthy = "✅"
-    }
-    return icons[alertLevel] or "📦"
-end
-
-function getTrendIcon(trend)
-    local icons = {
-        increasing = "📈",
-        decreasing = "📉",
-        stable = "➡️",
-        unknown = "❓"
-    }
-    return icons[trend] or "➡️"
-end
 
 -- Real-time stock alert notifications (these come automatically from server)
 RegisterNetEvent("stockalerts:urgentAlert")

@@ -6,6 +6,8 @@
 
 local QBCore = exports['qb-core']:GetCoreObject()
 
+local determineOptimalContainer
+
 -- ============================================
 -- CONTAINER-ENHANCED RESTAURANT FUNCTIONS
 -- ============================================
@@ -54,7 +56,7 @@ local function calculateContainerCosts(orderItems, restaurantId)
 end
 
 -- Determine optimal container type (same logic as warehouse)
-local function determineOptimalContainer(ingredient, quantity)
+determineOptimalContainer = function(ingredient, quantity)
     if not Config.DynamicContainers or not Config.DynamicContainers.containerTypes then
         return "ogz_crate"
     end
@@ -175,7 +177,7 @@ AddEventHandler('restaurant:orderIngredientsWithContainers', function(orderItems
             return
         end
         
-        local dynamicPrice = math.floor((item.price or 0) * priceMultiplier)
+        local dynamicPrice = math.floor((item and item.price or 0) * priceMultiplier)
         totalCost = totalCost + (dynamicPrice * quantity)
     end
 
@@ -209,7 +211,7 @@ AddEventHandler('restaurant:orderIngredientsWithContainers', function(orderItems
             end
         end
 
-        local dynamicPrice = math.floor(item.price * priceMultiplier)
+        local dynamicPrice = math.floor((item and item.price or 0) * priceMultiplier)
         local itemCost = dynamicPrice * quantity
         
         table.insert(queries, {

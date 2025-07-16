@@ -4,6 +4,7 @@
 -- ============================================
 
 local QBCore = exports['qb-core']:GetCoreObject()
+local initializeTables
 
 -- Database connection verification
 local function verifyDatabaseConnection()
