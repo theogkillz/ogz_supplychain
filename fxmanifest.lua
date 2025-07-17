@@ -116,8 +116,11 @@ client_scripts {
     'client/systems/restaurants/cl_restaurant_staff.lua',      -- NEW staff management UI
     
     -- Warehouse System
-    'client/systems/warehouse/cl_warehouse_ui.lua',            -- Migrated from cl_warehouse.lua
-    'client/systems/warehouse/cl_warehouse_containers.lua',    -- NEW container UI
+    'client/systems/warehouses/cl_warehouse_ui.lua',
+    'client/systems/warehouses/cl_warehouse_orders.lua',      -- NEW
+    'client/systems/warehouses/cl_warehouse_vehicles.lua',    -- NEW  
+    'client/systems/warehouses/cl_warehouse_loading.lua',     -- NEW
+    'client/systems/warehouses/cl_warehouse_containers.lua',    -- NEW container UI
     
     -- NEW Docks System
     'client/systems/docks/cl_docks_ui.lua',                    -- NEW docks interface

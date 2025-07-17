@@ -18,7 +18,7 @@ Citizen.CreateThread(function()
             {
                 name = "seller_distributor",
                 icon = "fas fa-hand-holding-usd",
-                label = "Sell Ingredients",
+                label = "Distributor",
                 onSelect = function()
                     TriggerEvent("seller:openSellMenu")
                 end
