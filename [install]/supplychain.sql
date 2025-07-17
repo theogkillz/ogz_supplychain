@@ -433,7 +433,522 @@ CREATE TABLE IF NOT EXISTS `supply_emergency_orders` (
     KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
+-- Restaurant Ownership Table
+CREATE TABLE IF NOT EXISTS `supply_restaurant_ownership` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `restaurant_id` int(11) NOT NULL,
+  `owner_citizenid` varchar(50) NOT NULL,
+  `owner_name` varchar(100) NOT NULL,
+  `purchase_price` decimal(10,2) NOT NULL,
+  `purchase_date` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `ownership_type` enum('individual','partnership','corporation') DEFAULT 'individual',
+  `business_license` varchar(50) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_restaurant` (`restaurant_id`),
+  KEY `idx_owner_citizenid` (`owner_citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
+-- Restaurant Staff Management
+CREATE TABLE IF NOT EXISTS `supply_restaurant_staff` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `restaurant_id` int(11) NOT NULL,
+  `employee_citizenid` varchar(50) NOT NULL,
+  `employee_name` varchar(100) NOT NULL,
+  `position` enum('owner','manager','employee','temp') DEFAULT 'employee',
+  `permissions` json DEFAULT NULL,
+  `hourly_wage` decimal(8,2) DEFAULT 0.00,
+  `hired_date` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `is_active` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_restaurant_employee` (`restaurant_id`, `employee_citizenid`),
+  KEY `idx_restaurant_id` (`restaurant_id`),
+  KEY `idx_employee_citizenid` (`employee_citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Restaurant Financial Tracking
+CREATE TABLE IF NOT EXISTS `supply_restaurant_finances` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `restaurant_id` int(11) NOT NULL,
+  `transaction_type` enum('revenue','expense','supply_order','staff_payment','maintenance') NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `reference_id` varchar(100) DEFAULT NULL, -- Links to order_group_id, etc.
+  `created_by` varchar(50) DEFAULT NULL,
+  `transaction_date` timestamp DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_restaurant_id` (`restaurant_id`),
+  KEY `idx_transaction_type` (`transaction_type`),
+  KEY `idx_transaction_date` (`transaction_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Restaurant Settings/Preferences
+CREATE TABLE IF NOT EXISTS `supply_restaurant_settings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `restaurant_id` int(11) NOT NULL,
+  `setting_name` varchar(100) NOT NULL,
+  `setting_value` text DEFAULT NULL,
+  `updated_by` varchar(50) DEFAULT NULL,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_restaurant_setting` (`restaurant_id`, `setting_name`),
+  KEY `idx_restaurant_id` (`restaurant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ===============================================
+-- DOCKS IMPORT SYSTEM - DATABASE SCHEMA
+-- Extends OGZ-SupplyChain with international import functionality
+-- ===============================================
+
+-- International Suppliers Management
+CREATE TABLE IF NOT EXISTS `supply_international_suppliers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `supplier_name` varchar(100) NOT NULL,
+  `supplier_code` varchar(20) NOT NULL,
+  `country_origin` varchar(50) NOT NULL,
+  `continent` varchar(30) NOT NULL,
+  `supplier_type` enum('agricultural','livestock','seafood','processed','specialty','bulk') DEFAULT 'agricultural',
+  `reliability_rating` decimal(3,2) DEFAULT 5.00,
+  `quality_rating` decimal(3,2) DEFAULT 5.00,
+  `price_competitiveness` decimal(3,2) DEFAULT 5.00,
+  `shipping_time_days` int(11) DEFAULT 7,
+  `minimum_order_value` decimal(10,2) DEFAULT 5000.00,
+  `preferred_payment_terms` varchar(50) DEFAULT 'NET30',
+  `certifications` json DEFAULT NULL,
+  `specialties` json DEFAULT NULL,
+  `seasonal_availability` json DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `reputation_score` int(11) DEFAULT 100,
+  `total_orders_completed` int(11) DEFAULT 0,
+  `average_delivery_time` decimal(4,1) DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_supplier_code` (`supplier_code`),
+  KEY `idx_country_origin` (`country_origin`),
+  KEY `idx_supplier_type` (`supplier_type`),
+  KEY `idx_reliability_rating` (`reliability_rating`),
+  KEY `idx_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Supplier Product Catalog
+CREATE TABLE IF NOT EXISTS `supply_supplier_catalog` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `supplier_id` int(11) NOT NULL,
+  `product_name` varchar(100) NOT NULL,
+  `product_code` varchar(50) NOT NULL,
+  `category` varchar(50) NOT NULL,
+  `base_price_per_unit` decimal(8,2) NOT NULL,
+  `currency` varchar(10) DEFAULT 'USD',
+  `minimum_order_quantity` int(11) DEFAULT 100,
+  `maximum_order_quantity` int(11) DEFAULT 10000,
+  `quality_grade` enum('standard','premium','organic','luxury') DEFAULT 'standard',
+  `shelf_life_days` int(11) DEFAULT 30,
+  `storage_requirements` varchar(100) DEFAULT 'dry_storage',
+  `seasonal_multiplier` json DEFAULT NULL,
+  `availability_calendar` json DEFAULT NULL,
+  `certifications` json DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `is_available` tinyint(1) DEFAULT 1,
+  `last_price_update` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_supplier_product` (`supplier_id`, `product_code`),
+  FOREIGN KEY (`supplier_id`) REFERENCES `supply_international_suppliers`(`id`) ON DELETE CASCADE,
+  KEY `idx_category` (`category`),
+  KEY `idx_quality_grade` (`quality_grade`),
+  KEY `idx_is_available` (`is_available`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Import Orders Management
+CREATE TABLE IF NOT EXISTS `supply_import_orders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `import_order_id` varchar(100) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `ordered_by` varchar(50) NOT NULL,
+  `order_date` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `requested_delivery_date` date DEFAULT NULL,
+  `estimated_arrival_date` date DEFAULT NULL,
+  `actual_arrival_date` date DEFAULT NULL,
+  `total_items` int(11) DEFAULT 0,
+  `total_containers` int(11) DEFAULT 0,
+  `total_value` decimal(12,2) DEFAULT 0.00,
+  `currency` varchar(10) DEFAULT 'USD',
+  `exchange_rate` decimal(8,4) DEFAULT 1.0000,
+  `shipping_cost` decimal(10,2) DEFAULT 0.00,
+  `customs_fees` decimal(8,2) DEFAULT 0.00,
+  `insurance_cost` decimal(8,2) DEFAULT 0.00,
+  `total_landed_cost` decimal(12,2) DEFAULT 0.00,
+  `payment_terms` varchar(50) DEFAULT 'NET30',
+  `payment_status` enum('pending','partial','paid','overdue') DEFAULT 'pending',
+  `order_status` enum('draft','submitted','confirmed','shipped','in_transit','customs','arrived','processing','completed','cancelled') DEFAULT 'draft',
+  `priority` enum('standard','urgent','emergency') DEFAULT 'standard',
+  `special_instructions` text DEFAULT NULL,
+  `tracking_number` varchar(100) DEFAULT NULL,
+  `vessel_name` varchar(100) DEFAULT NULL,
+  `port_of_origin` varchar(100) DEFAULT NULL,
+  `port_of_destination` varchar(100) DEFAULT 'Los Santos Port',
+  `customs_cleared` tinyint(1) DEFAULT 0,
+  `quality_inspection_passed` tinyint(1) DEFAULT 0,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_import_order_id` (`import_order_id`),
+  FOREIGN KEY (`supplier_id`) REFERENCES `supply_international_suppliers`(`id`),
+  KEY `idx_ordered_by` (`ordered_by`),
+  KEY `idx_order_status` (`order_status`),
+  KEY `idx_estimated_arrival` (`estimated_arrival_date`),
+  KEY `idx_priority` (`priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Import Order Line Items
+CREATE TABLE IF NOT EXISTS `supply_import_order_items` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `import_order_id` varchar(100) NOT NULL,
+  `supplier_product_id` int(11) NOT NULL,
+  `product_name` varchar(100) NOT NULL,
+  `quantity_ordered` int(11) NOT NULL,
+  `quantity_received` int(11) DEFAULT 0,
+  `unit_price` decimal(8,2) NOT NULL,
+  `currency` varchar(10) DEFAULT 'USD',
+  `line_total` decimal(10,2) NOT NULL,
+  `container_type_required` varchar(50) DEFAULT 'standard',
+  `quality_grade_ordered` varchar(50) DEFAULT 'standard',
+  `quality_grade_received` varchar(50) DEFAULT NULL,
+  `expiration_date` date DEFAULT NULL,
+  `lot_number` varchar(50) DEFAULT NULL,
+  `inspection_notes` text DEFAULT NULL,
+  `condition_on_arrival` enum('excellent','good','fair','poor','damaged') DEFAULT NULL,
+  `accepted_quantity` int(11) DEFAULT 0,
+  `rejected_quantity` int(11) DEFAULT 0,
+  `rejection_reason` varchar(255) DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`supplier_product_id`) REFERENCES `supply_supplier_catalog`(`id`),
+  KEY `idx_import_order_id` (`import_order_id`),
+  KEY `idx_quality_grade_received` (`quality_grade_received`),
+  KEY `idx_condition_on_arrival` (`condition_on_arrival`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Dock Operations & Worker Activities
+CREATE TABLE IF NOT EXISTS `supply_dock_operations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `operation_id` varchar(100) NOT NULL,
+  `import_order_id` varchar(100) NOT NULL,
+  `operation_type` enum('unloading','inspection','customs','processing','forwarding') NOT NULL,
+  `assigned_worker` varchar(50) DEFAULT NULL,
+  `worker_name` varchar(100) DEFAULT NULL,
+  `start_time` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `end_time` timestamp NULL DEFAULT NULL,
+  `operation_status` enum('pending','in_progress','completed','failed','cancelled') DEFAULT 'pending',
+  `containers_processed` int(11) DEFAULT 0,
+  `items_processed` int(11) DEFAULT 0,
+  `quality_checks_performed` int(11) DEFAULT 0,
+  `issues_found` int(11) DEFAULT 0,
+  `operation_notes` text DEFAULT NULL,
+  `efficiency_rating` decimal(3,2) DEFAULT NULL,
+  `completion_time_minutes` int(11) DEFAULT NULL,
+  `base_pay` decimal(8,2) DEFAULT 0.00,
+  `bonus_pay` decimal(8,2) DEFAULT 0.00,
+  `total_pay` decimal(8,2) DEFAULT 0.00,
+  `equipment_used` json DEFAULT NULL,
+  `weather_conditions` varchar(50) DEFAULT NULL,
+  `difficulty_rating` enum('easy','normal','hard','extreme') DEFAULT 'normal',
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_operation_id` (`operation_id`),
+  KEY `idx_import_order_id` (`import_order_id`),
+  KEY `idx_assigned_worker` (`assigned_worker`),
+  KEY `idx_operation_type` (`operation_type`),
+  KEY `idx_operation_status` (`operation_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Container Tracking Integration (extends existing container system)
+CREATE TABLE IF NOT EXISTS `supply_import_containers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `container_id` varchar(100) NOT NULL,
+  `import_order_id` varchar(100) NOT NULL,
+  `container_type` varchar(50) NOT NULL,
+  `container_size` enum('20ft','40ft','40ft_hc','45ft') DEFAULT '40ft',
+  `seal_number` varchar(50) DEFAULT NULL,
+  `weight_gross` decimal(8,2) DEFAULT NULL,
+  `weight_net` decimal(8,2) DEFAULT NULL,
+  `temperature_controlled` tinyint(1) DEFAULT 0,
+  `target_temperature` decimal(4,1) DEFAULT NULL,
+  `current_temperature` decimal(4,1) DEFAULT NULL,
+  `humidity_level` decimal(4,1) DEFAULT NULL,
+  `position_at_dock` varchar(20) DEFAULT NULL,
+  `unloading_priority` int(11) DEFAULT 1,
+  `customs_status` enum('pending','inspecting','cleared','hold','rejected') DEFAULT 'pending',
+  `inspection_required` tinyint(1) DEFAULT 1,
+  `inspection_completed` tinyint(1) DEFAULT 0,
+  `quality_grade_verified` varchar(50) DEFAULT NULL,
+  `damage_assessment` enum('none','minor','moderate','major','total_loss') DEFAULT 'none',
+  `forwarded_to_warehouse` tinyint(1) DEFAULT 0,
+  `forwarding_date` timestamp NULL DEFAULT NULL,
+  `storage_location` varchar(50) DEFAULT NULL,
+  `handling_instructions` text DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_container_id` (`container_id`),
+  KEY `idx_import_order_id` (`import_order_id`),
+  KEY `idx_customs_status` (`customs_status`),
+  KEY `idx_forwarded_to_warehouse` (`forwarded_to_warehouse`),
+  KEY `idx_unloading_priority` (`unloading_priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Dock Worker Performance & Statistics
+CREATE TABLE IF NOT EXISTS `supply_dock_worker_stats` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `worker_citizenid` varchar(50) NOT NULL,
+  `worker_name` varchar(100) NOT NULL,
+  `shift_date` date NOT NULL,
+  `shift_start` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `shift_end` timestamp NULL DEFAULT NULL,
+  `total_hours_worked` decimal(4,2) DEFAULT 0.00,
+  `operations_completed` int(11) DEFAULT 0,
+  `containers_processed` int(11) DEFAULT 0,
+  `total_items_handled` int(11) DEFAULT 0,
+  `quality_inspections_performed` int(11) DEFAULT 0,
+  `issues_identified` int(11) DEFAULT 0,
+  `efficiency_score` decimal(4,2) DEFAULT 0.00,
+  `safety_incidents` int(11) DEFAULT 0,
+  `base_earnings` decimal(8,2) DEFAULT 0.00,
+  `bonus_earnings` decimal(8,2) DEFAULT 0.00,
+  `total_earnings` decimal(8,2) DEFAULT 0.00,
+  `performance_rating` decimal(3,2) DEFAULT 5.00,
+  `supervisor_notes` text DEFAULT NULL,
+  `equipment_certifications` json DEFAULT NULL,
+  `overtime_hours` decimal(4,2) DEFAULT 0.00,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_worker_date` (`worker_citizenid`, `shift_date`),
+  KEY `idx_worker_citizenid` (`worker_citizenid`),
+  KEY `idx_shift_date` (`shift_date`),
+  KEY `idx_performance_rating` (`performance_rating`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Market Impact Tracking (integrates with existing market system)
+CREATE TABLE IF NOT EXISTS `supply_import_market_impact` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `import_order_id` varchar(100) NOT NULL,
+  `ingredient_affected` varchar(100) NOT NULL,
+  `quantity_imported` int(11) NOT NULL,
+  `import_date` date NOT NULL,
+  `pre_import_price` decimal(8,2) DEFAULT NULL,
+  `post_import_price` decimal(8,2) DEFAULT NULL,
+  `price_change_percentage` decimal(5,2) DEFAULT NULL,
+  `market_impact_score` decimal(4,2) DEFAULT 0.00,
+  `supply_level_before` int(11) DEFAULT 0,
+  `supply_level_after` int(11) DEFAULT 0,
+  `demand_satisfaction_rating` decimal(3,2) DEFAULT NULL,
+  `market_stabilization_effect` enum('stabilizing','destabilizing','neutral') DEFAULT 'neutral',
+  `competitive_advantage_gained` tinyint(1) DEFAULT 0,
+  `import_quality_premium` decimal(4,3) DEFAULT 0.000,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_import_order_id` (`import_order_id`),
+  KEY `idx_ingredient_affected` (`ingredient_affected`),
+  KEY `idx_import_date` (`import_date`),
+  KEY `idx_market_impact_score` (`market_impact_score`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Customs & Regulatory Compliance
+CREATE TABLE IF NOT EXISTS `supply_customs_documentation` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `import_order_id` varchar(100) NOT NULL,
+  `document_type` enum('commercial_invoice','bill_of_lading','packing_list','certificate_of_origin','health_certificate','quality_certificate','import_permit') NOT NULL,
+  `document_number` varchar(100) DEFAULT NULL,
+  `issued_by` varchar(100) DEFAULT NULL,
+  `issue_date` date DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `document_status` enum('pending','submitted','approved','rejected','expired') DEFAULT 'pending',
+  `verification_required` tinyint(1) DEFAULT 1,
+  `verification_completed` tinyint(1) DEFAULT 0,
+  `verification_date` timestamp NULL DEFAULT NULL,
+  `verified_by` varchar(50) DEFAULT NULL,
+  `compliance_notes` text DEFAULT NULL,
+  `rejection_reason` varchar(255) DEFAULT NULL,
+  `fees_associated` decimal(8,2) DEFAULT 0.00,
+  `processing_time_hours` int(11) DEFAULT NULL,
+  `document_hash` varchar(255) DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_import_order_id` (`import_order_id`),
+  KEY `idx_document_type` (`document_type`),
+  KEY `idx_document_status` (`document_status`),
+  KEY `idx_expiry_date` (`expiry_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Port Infrastructure & Scheduling
+CREATE TABLE IF NOT EXISTS `supply_port_schedule` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `vessel_name` varchar(100) NOT NULL,
+  `vessel_type` enum('container_ship','bulk_carrier','reefer_ship','general_cargo') DEFAULT 'container_ship',
+  `scheduled_arrival` timestamp NOT NULL,
+  `actual_arrival` timestamp NULL DEFAULT NULL,
+  `scheduled_departure` timestamp NOT NULL,
+  `actual_departure` timestamp NULL DEFAULT NULL,
+  `berth_assigned` varchar(20) DEFAULT NULL,
+  `containers_aboard` int(11) DEFAULT 0,
+  `import_orders_count` int(11) DEFAULT 0,
+  `total_cargo_value` decimal(12,2) DEFAULT 0.00,
+  `priority_level` enum('standard','high','urgent','emergency') DEFAULT 'standard',
+  `weather_delay` tinyint(1) DEFAULT 0,
+  `customs_delay` tinyint(1) DEFAULT 0,
+  `mechanical_issues` tinyint(1) DEFAULT 0,
+  `port_congestion_delay` tinyint(1) DEFAULT 0,
+  `estimated_processing_time` int(11) DEFAULT 480,
+  `actual_processing_time` int(11) DEFAULT NULL,
+  `vessel_status` enum('scheduled','approaching','docked','unloading','departed','delayed','cancelled') DEFAULT 'scheduled',
+  `captain_name` varchar(100) DEFAULT NULL,
+  `shipping_line` varchar(100) DEFAULT NULL,
+  `port_agent` varchar(100) DEFAULT NULL,
+  `special_requirements` text DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_vessel_name` (`vessel_name`),
+  KEY `idx_scheduled_arrival` (`scheduled_arrival`),
+  KEY `idx_vessel_status` (`vessel_status`),
+  KEY `idx_priority_level` (`priority_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- ===============================================
+-- INTEGRATION WITH EXISTING OGZ TABLES
+-- ===============================================
+
+-- Extend existing supply_warehouse_stock for import tracking
+ALTER TABLE `supply_warehouse_stock` 
+ADD COLUMN `import_source` enum('domestic','imported','mixed') DEFAULT 'domestic',
+ADD COLUMN `last_import_date` date DEFAULT NULL,
+ADD COLUMN `import_quality_premium` decimal(4,3) DEFAULT 0.000,
+ADD COLUMN `supplier_id` int(11) DEFAULT NULL,
+ADD COLUMN `import_batch_id` varchar(100) DEFAULT NULL;
+
+-- Add indexes for performance
+ALTER TABLE `supply_warehouse_stock`
+ADD INDEX `idx_import_source` (`import_source`),
+ADD INDEX `idx_last_import_date` (`last_import_date`);
+
+-- Extend existing supply_containers table for import containers
+ALTER TABLE `supply_containers` 
+ADD COLUMN `import_container_id` varchar(100) DEFAULT NULL,
+ADD COLUMN `country_of_origin` varchar(50) DEFAULT NULL,
+ADD COLUMN `import_inspection_passed` tinyint(1) DEFAULT 1,
+ADD COLUMN `customs_cleared` tinyint(1) DEFAULT 1,
+ADD COLUMN `landed_cost_per_unit` decimal(8,2) DEFAULT NULL;
+
+-- Add indexes for import container tracking
+ALTER TABLE `supply_containers`
+ADD INDEX `idx_import_container_id` (`import_container_id`),
+ADD INDEX `idx_country_of_origin` (`country_of_origin`);
+
+-- ===============================================
+-- DEFAULT INTERNATIONAL SUPPLIERS
+-- ===============================================
+
+-- Insert sample international suppliers
+INSERT IGNORE INTO `supply_international_suppliers` (`supplier_name`, `supplier_code`, `country_origin`, `continent`, `supplier_type`, `reliability_rating`, `quality_rating`, `price_competitiveness`, `shipping_time_days`, `minimum_order_value`, `specialties`) VALUES
+('Pacific Harvest Co.', 'PHC001', 'Japan', 'Asia', 'seafood', 4.8, 4.9, 3.5, 10, 8000.00, '["premium_fish", "seaweed", "specialty_seafood"]'),
+('Euro Fresh Farms', 'EFF002', 'Netherlands', 'Europe', 'agricultural', 4.5, 4.7, 4.2, 7, 5000.00, '["organic_vegetables", "greenhouse_produce", "flowers"]'),
+('Amazon Bounty Ltd.', 'ABL003', 'Brazil', 'South America', 'agricultural', 4.2, 4.1, 4.8, 14, 3000.00, '["tropical_fruits", "coffee", "exotic_spices"]'),
+('Outback Provisions', 'OBP004', 'Australia', 'Oceania', 'livestock', 4.6, 4.8, 3.8, 21, 10000.00, '["premium_beef", "lamb", "dairy_products"]'),
+('Nordic Naturals', 'NN005', 'Norway', 'Europe', 'seafood', 4.9, 4.9, 3.2, 12, 7500.00, '["salmon", "arctic_fish", "sustainable_seafood"]'),
+('African Spice Trading', 'AST006', 'South Africa', 'Africa', 'specialty', 4.0, 4.3, 4.5, 18, 2500.00, '["exotic_spices", "herbs", "traditional_seasonings"]'),
+('Maple Leaf Exports', 'MLE007', 'Canada', 'North America', 'agricultural', 4.7, 4.6, 4.0, 5, 4000.00, '["grain", "maple_products", "organic_produce"]'),
+('Himalayan Harvest', 'HH008', 'India', 'Asia', 'specialty', 4.3, 4.2, 4.7, 16, 3500.00, '["exotic_spices", "rice_varieties", "lentils"]');
+
+-- Insert sample supplier catalog items
+INSERT IGNORE INTO `supply_supplier_catalog` (`supplier_id`, `product_name`, `product_code`, `category`, `base_price_per_unit`, `minimum_order_quantity`, `quality_grade`, `shelf_life_days`) VALUES
+(1, 'Premium Bluefin Tuna', 'PHC-TUNA-001', 'Seafood', 45.00, 50, 'luxury', 7),
+(1, 'Fresh Sea Bass', 'PHC-BASS-002', 'Seafood', 18.50, 100, 'premium', 5),
+(2, 'Organic Heirloom Tomatoes', 'EFF-TOM-001', 'Vegetables', 8.75, 200, 'organic', 14),
+(2, 'Dutch Greenhouse Lettuce', 'EFF-LET-002', 'Vegetables', 4.20, 300, 'premium', 10),
+(3, 'Exotic Tropical Fruit Mix', 'ABL-FRUIT-001', 'Fruits', 12.30, 150, 'premium', 8),
+(3, 'Brazilian Coffee Beans', 'ABL-COFFEE-001', 'Specialty', 22.50, 100, 'premium', 365),
+(4, 'Wagyu Beef Cuts', 'OBP-BEEF-001', 'Meat', 85.00, 25, 'luxury', 21),
+(4, 'Premium Lamb Chops', 'OBP-LAMB-001', 'Meat', 32.50, 50, 'premium', 18),
+(5, 'Norwegian Atlantic Salmon', 'NN-SALMON-001', 'Seafood', 28.75, 75, 'premium', 10),
+(6, 'Exotic African Spice Blend', 'AST-SPICE-001', 'Spices', 15.60, 50, 'premium', 730),
+(7, 'Canadian Organic Grain', 'MLE-GRAIN-001', 'Grains', 6.25, 500, 'organic', 180),
+(8, 'Himalayan Pink Salt', 'HH-SALT-001', 'Specialty', 12.80, 100, 'premium', 1095);
+
+-- ===============================================
+-- USEFUL QUERIES FOR TESTING
+-- ===============================================
+
+-- Check active import orders
+SELECT 
+    io.import_order_id,
+    s.supplier_name,
+    io.order_status,
+    io.total_value,
+    io.estimated_arrival_date,
+    COUNT(ioi.id) as line_items
+FROM supply_import_orders io
+JOIN supply_international_suppliers s ON io.supplier_id = s.id
+LEFT JOIN supply_import_order_items ioi ON io.import_order_id = ioi.import_order_id
+WHERE io.order_status IN ('confirmed', 'shipped', 'in_transit', 'arrived')
+GROUP BY io.id;
+
+-- Get dock worker performance summary
+SELECT 
+    worker_citizenid,
+    worker_name,
+    SUM(total_hours_worked) as total_hours,
+    SUM(operations_completed) as total_operations,
+    AVG(efficiency_score) as avg_efficiency,
+    SUM(total_earnings) as total_earnings
+FROM supply_dock_worker_stats 
+WHERE shift_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY worker_citizenid
+ORDER BY avg_efficiency DESC;
+
+-- Check container processing status
+SELECT 
+    ic.container_id,
+    io.import_order_id,
+    s.supplier_name,
+    ic.customs_status,
+    ic.inspection_completed,
+    ic.forwarded_to_warehouse
+FROM supply_import_containers ic
+JOIN supply_import_orders io ON ic.import_order_id = io.import_order_id
+JOIN supply_international_suppliers s ON io.supplier_id = s.id
+WHERE ic.forwarded_to_warehouse = 0;
+
+-- Market impact analysis
+SELECT 
+    ima.ingredient_affected,
+    COUNT(*) as import_events,
+    AVG(ima.price_change_percentage) as avg_price_impact,
+    SUM(ima.quantity_imported) as total_imported,
+    AVG(ima.market_impact_score) as avg_market_impact
+FROM supply_import_market_impact ima
+WHERE ima.import_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+GROUP BY ima.ingredient_affected
+ORDER BY avg_market_impact DESC;
+
+-- ===============================================
+-- COMPLETION MESSAGE
+-- ===============================================
+
+SELECT 
+    'Docks Import System Database Complete!' as message,
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES 
+     WHERE TABLE_SCHEMA = DATABASE() 
+     AND TABLE_NAME LIKE 'supply_%' 
+     AND TABLE_NAME IN ('supply_international_suppliers', 'supply_supplier_catalog', 'supply_import_orders', 'supply_import_order_items', 'supply_dock_operations', 'supply_import_containers', 'supply_dock_worker_stats', 'supply_import_market_impact', 'supply_customs_documentation', 'supply_port_schedule')) as new_tables_created,
+    'Ready for Docks Configuration Phase!' as next_step;
+
+    
 -- ===============================================
 -- INSERT DEFAULT MARKET SETTINGS (OPTIONAL)
 -- ===============================================

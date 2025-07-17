@@ -114,6 +114,7 @@ client_scripts {
     'client/systems/restaurants/cl_restaurant_ui.lua',         -- Migrated from cl_restaurant.lua
     'client/systems/restaurants/cl_restaurant_management.lua', -- NEW ownership UI
     'client/systems/restaurants/cl_restaurant_staff.lua',      -- NEW staff management UI
+    'client/systems/restaurants/cl_restaurant_ownership.lua',
     
     -- Warehouse System
     'client/systems/warehouses/cl_warehouse_ui.lua',           -- Core UI & job validation
