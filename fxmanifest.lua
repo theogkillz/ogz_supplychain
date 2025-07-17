@@ -116,11 +116,12 @@ client_scripts {
     'client/systems/restaurants/cl_restaurant_staff.lua',      -- NEW staff management UI
     
     -- Warehouse System
-    'client/systems/warehouses/cl_warehouse_ui.lua',
-    'client/systems/warehouses/cl_warehouse_orders.lua',      -- NEW
-    'client/systems/warehouses/cl_warehouse_vehicles.lua',    -- NEW  
-    'client/systems/warehouses/cl_warehouse_loading.lua',     -- NEW
-    'client/systems/warehouses/cl_warehouse_containers.lua',    -- NEW container UI
+    'client/systems/warehouses/cl_warehouse_ui.lua',           -- Core UI & job validation
+    'client/systems/warehouses/cl_warehouse_orders.lua',       -- Order processing & acceptance  
+    'client/systems/warehouses/cl_warehouse_vehicles.lua',     -- Vehicle spawning system
+    'client/systems/warehouses/cl_warehouse_loading.lua',      -- Box loading systems
+    'client/systems/warehouses/cl_warehouse_delivery.lua',     -- 🔥 W5 DELIVERY COORDINATION
+    'client/systems/warehouses/cl_warehouse_sourcing.lua',     -- Seller/distributor system
     
     -- NEW Docks System
     'client/systems/docks/cl_docks_ui.lua',                    -- NEW docks interface
