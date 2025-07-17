@@ -20,7 +20,7 @@ shared_scripts {
     
     -- System Configurations
     'config/config_restaurants.lua',    -- NEW for restaurant owners
-    'config/config_docks.lua',         -- NEW for docks import  
+    -- 'config/config_docks.lua',         -- NEW for docks import  
     'config/config_warehouse.lua',     -- NEW extracted from main
     'config/config_containers.lua',    -- ✅ Already perfect
     'config/config_manufacturing.lua', -- ✅ Already perfect
@@ -60,10 +60,10 @@ server_scripts {
     'server/systems/warehouse/sv_warehouse_containers.lua',  -- Migrated from sv_warehouse_containers.lua
     
     -- NEW Docks Import System
-    'server/systems/docks/sv_docks_core.lua',               -- NEW docks management
-    'server/systems/docks/sv_docks_workers.lua',            -- NEW dock worker system
-    'server/systems/docks/sv_docks_imports.lua',            -- NEW import processing
-    'server/systems/docks/sv_docks_containers.lua',         -- NEW container handling
+    -- 'server/systems/docks/sv_docks_core.lua',               -- NEW docks management
+    -- 'server/systems/docks/sv_docks_workers.lua',            -- NEW dock worker system
+    -- 'server/systems/docks/sv_docks_imports.lua',            -- NEW import processing
+    -- 'server/systems/docks/sv_docks_containers.lua',         -- NEW container handling
     
     -- Container System
     'server/systems/containers/sv_containers_core.lua',      -- Migrated from sv_containers.lua
@@ -125,9 +125,9 @@ client_scripts {
     'client/systems/warehouses/cl_warehouse_sourcing.lua',     -- Seller/distributor system
     
     -- NEW Docks System
-    'client/systems/docks/cl_docks_ui.lua',                    -- NEW docks interface
-    'client/systems/docks/cl_docks_workers.lua',               -- NEW dock worker UI
-    'client/systems/docks/cl_docks_operations.lua',            -- NEW import operations
+    -- 'client/systems/docks/cl_docks_ui.lua',                    -- NEW docks interface
+    -- 'client/systems/docks/cl_docks_workers.lua',               -- NEW dock worker UI
+    -- 'client/systems/docks/cl_docks_operations.lua',            -- NEW import operations
     
     -- Container System
     'client/systems/containers/cl_containers_ui.lua',          -- Migrated from cl_containers.lua
