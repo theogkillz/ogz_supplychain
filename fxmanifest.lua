@@ -105,58 +105,53 @@ server_scripts {
 
 -- CLIENT SCRIPTS (Organized by System)  
 client_scripts {
-    -- Core Foundation
-    'client/core/cl_main.lua',                              -- Migrated from cl_main.lua
-    'client/core/cl_events.lua',                            -- NEW event handling
-    'client/core/cl_ui_manager.lua',                        -- NEW UI coordination
+    -- 1. CORE SYSTEMS (Foundation - Load First)
+    'client/core/cl_main.lua',
+    'client/core/cl_events.lua', 
+    'client/core/cl_ui_manager.lua',
     
-    -- Restaurant System
-    'client/systems/restaurants/cl_restaurant_ui.lua',         -- Migrated from cl_restaurant.lua
-    'client/systems/restaurants/cl_restaurant_management.lua', -- NEW ownership UI
-    'client/systems/restaurants/cl_restaurant_staff.lua',      -- NEW staff management UI
+    -- 2. INTEGRATION SYSTEMS (Dependencies)
+    'client/integration/integration_notifications.lua',
+    'client/integration/integration_ox_target.lua',
+    
+    -- 3. ACHIEVEMENT SYSTEMS (Load Before Business Logic!)
+    'client/systems/achievements/cl_achievements_ui.lua',
+    'client/systems/achievements/cl_achievements_tracking.lua',
+    
+    -- 4. BUSINESS LOGIC SYSTEMS (These trigger achievement events)
+    'client/systems/vehicles/cl_vehicle_rewards.lua',
+    'client/systems/warehouses/cl_warehouse_ui.lua',
+    'client/systems/warehouses/cl_warehouse_orders.lua',
+    'client/systems/warehouses/cl_warehouse_vehicles.lua',
+    'client/systems/warehouses/cl_warehouse_loading.lua',
+    'client/systems/warehouses/cl_warehouse_delivery.lua',
+    'client/systems/warehouses/cl_warehouse_sourcing.lua',
+    
+    'client/systems/containers/cl_containers_ui.lua',
+    'client/systems/containers/cl_containers_dynamic.lua',
+    'client/systems/containers/cl_containers_quality.lua',
+    
+    'client/systems/restaurants/cl_restaurant_ui.lua',
+    'client/systems/restaurants/cl_restaurant_management.lua',
+    'client/systems/restaurants/cl_restaurant_staff.lua',
     'client/systems/restaurants/cl_restaurant_ownership.lua',
     
-    -- Warehouse System
-    'client/systems/warehouses/cl_warehouse_ui.lua',           -- Core UI & job validation
-    'client/systems/warehouses/cl_warehouse_orders.lua',       -- Order processing & acceptance  
-    'client/systems/warehouses/cl_warehouse_vehicles.lua',     -- Vehicle spawning system
-    'client/systems/warehouses/cl_warehouse_loading.lua',      -- Box loading systems
-    'client/systems/warehouses/cl_warehouse_delivery.lua',     -- 🔥 W5 DELIVERY COORDINATION
-    'client/systems/warehouses/cl_warehouse_sourcing.lua',     -- Seller/distributor system
-    
-    -- NEW Docks System
-    -- 'client/systems/docks/cl_docks_ui.lua',                    -- NEW docks interface
-    -- 'client/systems/docks/cl_docks_workers.lua',               -- NEW dock worker UI
-    -- 'client/systems/docks/cl_docks_operations.lua',            -- NEW import operations
-    
-    -- Container System
-    'client/systems/containers/cl_containers_ui.lua',          -- Migrated from cl_containers.lua
-    'client/systems/containers/cl_containers_dynamic.lua',     -- Migrated from cl_containers_dynamic.lua
-    'client/systems/containers/cl_containers_quality.lua',     -- NEW quality monitoring
-    
-    -- Vehicle & Achievement System
-    'client/systems/vehicles/cl_vehicle_spawning.lua',         -- NEW vehicle management
-    'client/systems/vehicles/cl_vehicle_rewards.lua',          -- Migrated from cl_vehicle_achievements.lua
-    'client/systems/achievements/cl_achievements_ui.lua',      -- Migrated from cl_leaderboard.lua
-    'client/systems/achievements/cl_achievements_tracking.lua', -- NEW achievement tracking
-    
-    -- Manufacturing System
     'client/systems/manufacturing/cl_manufacturing_ui.lua',
-    'client/systems/manufacturing/cl_manufacturing_processing.lua', 
+    'client/systems/manufacturing/cl_manufacturing_processing.lua',
     'client/systems/manufacturing/cl_manufacturing_skills.lua',
-    'client/systems/manufacturing/cl_manufacturing_recipes.lua',    -- Migrated from cl_manufacturing.lua
+    'client/systems/manufacturing/cl_manufacturing_recipes.lua',
     
-    -- Team & Market Systems
-    'client/systems/team/cl_team_deliveries.lua',              -- Migrated from cl_team_deliveries.lua
-    'client/systems/market/cl_market.lua',                     -- Migrated from cl_market.lua
-    'client/systems/market/cl_stock_alerts.lua',               -- Migrated from cl_stock_alerts.lua
+    'client/systems/team/cl_team_deliveries.lua',
+    'client/systems/market/cl_market.lua',
+    'client/systems/market/cl_stock_alerts.lua',
     
-    -- Integration
-    'client/integration/integration_ox_target.lua',            -- NEW ox_target integration
-    'client/integration/integration_notifications.lua',       -- NEW notification integration
+    -- 5. ADMIN SYSTEMS (Load Last)
+    'client/admin/cl_admin_tools.lua',
     
-    -- Admin Tools
-    'client/admin/cl_admin_tools.lua',                         -- Migrated from cl_admin.lua
+    -- 6. EXPANSION SYSTEMS (Future - Load Last)
+    -- 'client/systems/docks/cl_docks_ui.lua',
+    -- 'client/systems/docks/cl_docks_workers.lua',
+    -- 'client/systems/docks/cl_docks_operations.lua',
 }
 
 dependencies {
