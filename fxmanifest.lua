@@ -141,7 +141,10 @@ client_scripts {
     'client/systems/achievements/cl_achievements_tracking.lua', -- NEW achievement tracking
     
     -- Manufacturing System
-    'client/systems/manufacturing/cl_manufacturing_ui.lua',    -- Migrated from cl_manufacturing.lua
+    'client/systems/manufacturing/cl_manufacturing_ui.lua',
+    'client/systems/manufacturing/cl_manufacturing_processing.lua', 
+    'client/systems/manufacturing/cl_manufacturing_skills.lua',
+    'client/systems/manufacturing/cl_manufacturing_recipes.lua',    -- Migrated from cl_manufacturing.lua
     
     -- Team & Market Systems
     'client/systems/team/cl_team_deliveries.lua',              -- Migrated from cl_team_deliveries.lua
