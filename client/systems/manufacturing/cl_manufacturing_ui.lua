@@ -23,92 +23,84 @@ Citizen.CreateThread(function()
     for facilityId, facility in pairs(Config.ManufacturingFacilities) do
         print("[MANUFACTURING] Setting up facility " .. facilityId .. ": " .. facility.name)
         
-        -- Validate facility data using enterprise patterns
-        if not facility.position then
-            print("[ERROR] Facility " .. facilityId .. " missing position")
-            goto continue
-        end
-        
-        -- Create target zone with enterprise ox_target management
-        local targetSuccess = pcall(function()
-            exports.ogz_supplychain:createBoxZone({
-                coords = facility.position,
-                size = vector3(3.0, 3.0, 3.0),
-                rotation = facility.heading,
-                debug = false, -- Production mode
-                options = {
-                    {
-                        name = "manufacturing_facility_" .. facilityId,
-                        icon = "fas fa-industry",
-                        label = "Access " .. facility.name,
-                        groups = {"hurst"},
-                        onSelect = function()
-                            print("[MANUFACTURING] Facility " .. facilityId .. " accessed")
-                            TriggerEvent("manufacturing:openFacilityMenu", facilityId)
-                        end
+        -- ✅ FIXED: Use proper Lua control flow instead of goto
+        if facility.position then
+            -- Create target zone with enterprise ox_target management
+            local targetSuccess = pcall(function()
+                exports.ogz_supplychain:createBoxZone({
+                    coords = facility.position,
+                    size = vector3(3.0, 3.0, 3.0),
+                    rotation = facility.heading,
+                    debug = false, -- Production mode
+                    options = {
+                        {
+                            name = "manufacturing_facility_" .. facilityId,
+                            icon = "fas fa-industry",
+                            label = "Access " .. facility.name,
+                            groups = {"hurst"},
+                            onSelect = function()
+                                print("[MANUFACTURING] Facility " .. facilityId .. " accessed")
+                                TriggerEvent("manufacturing:openFacilityMenu", facilityId)
+                            end
+                        }
                     }
-                }
-            })
-        end)
-        
-        if not targetSuccess then
-            print("[ERROR] Failed to create target zone for facility " .. facilityId)
-            goto continue
+                })
+            end)
+            
+            if targetSuccess then
+                print("[SUCCESS] Target zone created for facility " .. facilityId)
+                
+                -- Spawn facility ped with enterprise validation
+                local pedModel = GetHashKey(facility.ped.model)
+                print("[MANUFACTURING] Requesting ped model: " .. facility.ped.model .. " (hash: " .. pedModel .. ")")
+                
+                RequestModel(pedModel)
+                local attempts = 0
+                while not HasModelLoaded(pedModel) and attempts < 50 do
+                    Citizen.Wait(100)
+                    attempts = attempts + 1
+                end
+                
+                if HasModelLoaded(pedModel) then
+                    local ped = CreatePed(4, pedModel, 
+                        facility.position.x, 
+                        facility.position.y, 
+                        facility.position.z - 1.0, 
+                        facility.ped.heading, 
+                        false, true)
+                    
+                    if DoesEntityExist(ped) then
+                        -- Configure ped with enterprise standards
+                        SetEntityAsMissionEntity(ped, true, true)
+                        SetBlockingOfNonTemporaryEvents(ped, true)
+                        FreezeEntityPosition(ped, true)
+                        SetEntityInvincible(ped, true)
+                        SetModelAsNoLongerNeeded(pedModel)
+                        
+                        print("[SUCCESS] Ped created for facility " .. facilityId)
+                        
+                        -- Create facility blip with enterprise styling
+                        local blip = AddBlipForCoord(facility.position.x, facility.position.y, facility.position.z)
+                        SetBlipSprite(blip, facility.blip.sprite)
+                        SetBlipDisplay(blip, 4)
+                        SetBlipScale(blip, facility.blip.scale)
+                        SetBlipColour(blip, facility.blip.color)
+                        SetBlipAsShortRange(blip, true)
+                        
+                        print("[SUCCESS] Blip created for facility " .. facilityId)
+                    else
+                        print("[ERROR] Failed to create ped for facility " .. facilityId)
+                    end
+                else
+                    print("[ERROR] Failed to load ped model for facility " .. facilityId .. ": " .. facility.ped.model)
+                end
+            else
+                print("[ERROR] Failed to create target zone for facility " .. facilityId)
+            end
         else
-            print("[SUCCESS] Target zone created for facility " .. facilityId)
+            print("[ERROR] Facility " .. facilityId .. " missing position")
         end
         
-        -- Spawn facility ped with enterprise validation
-        local pedModel = GetHashKey(facility.ped.model)
-        print("[MANUFACTURING] Requesting ped model: " .. facility.ped.model .. " (hash: " .. pedModel .. ")")
-        
-        RequestModel(pedModel)
-        local attempts = 0
-        while not HasModelLoaded(pedModel) and attempts < 50 do
-            Citizen.Wait(100)
-            attempts = attempts + 1
-        end
-        
-        if not HasModelLoaded(pedModel) then
-            print("[ERROR] Failed to load ped model for facility " .. facilityId .. ": " .. facility.ped.model)
-            goto continue
-        end
-        
-        local ped = CreatePed(4, pedModel, 
-            facility.position.x, 
-            facility.position.y, 
-            facility.position.z - 1.0, 
-            facility.ped.heading, 
-            false, true)
-        
-        if not DoesEntityExist(ped) then
-            print("[ERROR] Failed to create ped for facility " .. facilityId)
-            goto continue
-        end
-        
-        -- Configure ped with enterprise standards
-        SetEntityAsMissionEntity(ped, true, true)
-        SetBlockingOfNonTemporaryEvents(ped, true)
-        FreezeEntityPosition(ped, true)
-        SetEntityInvincible(ped, true)
-        SetModelAsNoLongerNeeded(pedModel)
-        
-        print("[SUCCESS] Ped created for facility " .. facilityId)
-        
-        -- Create facility blip with enterprise styling
-        local blip = AddBlipForCoord(facility.position.x, facility.position.y, facility.position.z)
-        SetBlipSprite(blip, facility.blip.sprite)
-        SetBlipDisplay(blip, 4)
-        SetBlipScale(blip, facility.blip.scale)
-        SetBlipColour(blip, facility.blip.color)
-        SetBlipAsShortRange(blip, true)
-        BeginTextCommandSetBlipName("STRING")
-        AddTextComponentString(facility.blip.label)
-        EndTextCommandSetBlipName(blip)
-        
-        print("[SUCCESS] Blip created for facility " .. facilityId)
-        
-        ::continue::
         Citizen.Wait(100)
     end
     

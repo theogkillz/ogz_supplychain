@@ -89,10 +89,6 @@ server_scripts {
     'server/systems/analytics/sv_performance_tracking.lua', -- Migrated from sv_performance_tracking.lua
     'server/systems/analytics/sv_leaderboard.lua',          -- Migrated from sv_leaderboard.lua
     
-    -- Integration Layer
-    'server/integration/integration_qbcore.lua',            -- NEW framework integration
-    'server/integration/integration_ox_inventory.lua',      -- NEW inventory integration
-    
     -- Admin & Management
     'server/admin/sv_admin_core.lua',                       -- Migrated from sv_admin.lua
     'server/admin/sv_admin_commands.lua',                   -- NEW admin commands
@@ -109,10 +105,6 @@ client_scripts {
     'client/core/cl_main.lua',
     'client/core/cl_events.lua', 
     'client/core/cl_ui_manager.lua',
-    
-    -- 2. INTEGRATION SYSTEMS (Dependencies)
-    'client/integration/integration_notifications.lua',
-    'client/integration/integration_ox_target.lua',
     
     -- 3. ACHIEVEMENT SYSTEMS (Load Before Business Logic!)
     'client/systems/achievements/cl_achievements_ui.lua',

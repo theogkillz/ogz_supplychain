@@ -1,6 +1,6 @@
 -- ============================================
 -- CORE MAIN SYSTEM - ENTERPRISE EDITION
--- Lightweight core with delegation to specialized systems
+-- Universal export functions + core state management
 -- ============================================
 
 local QBCore = exports['qb-core']:GetCoreObject()
@@ -17,6 +17,262 @@ local CoreState = {
     deliveryCooldown = 300000, -- 5 minutes in milliseconds
     playerData = nil
 }
+
+-- ============================================
+-- UNIVERSAL EXPORT FUNCTIONS
+-- These are called throughout the entire system
+-- ============================================
+
+-- Universal job validation
+local function validatePlayerAccess(feature)
+    local playerData = QBCore.Functions.GetPlayerData()
+    if not playerData or not playerData.job then
+
+        return false
+    end
+    
+    local playerJob = playerData.job.name
+    
+    -- Define job access per feature
+    local accessRules = {
+        warehouse = {"hurst"},
+        delivery = {"hurst"}, 
+        manufacturing = {"hurst"},
+        restaurant = {"all"}, -- Handled per-restaurant in business logic
+        admin = {"admin", "god"}
+    }
+    
+    local allowedJobs = accessRules[feature] or {"hurst"}
+    
+    -- Check if job is allowed
+    for _, job in ipairs(allowedJobs) do
+        if playerJob == job then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Universal success notification
+local function successNotify(title, description, options)
+    local notifyData = {
+        title = title,
+        description = description,
+        type = "success",
+        duration = (options and options.duration) or 5000,
+        position = Config.UI and Config.UI.notificationPosition or "center-right",
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    }
+    
+    lib.notify(notifyData)
+    return true
+end
+
+-- Universal error notification  
+local function errorNotify(title, description, options)
+    local notifyData = {
+        title = title,
+        description = description,
+        type = "error",
+        duration = (options and options.duration) or 8000,
+        position = Config.UI and Config.UI.notificationPosition or "center-right",
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    }
+    
+    lib.notify(notifyData)
+    return true
+end
+
+-- Universal info notification
+local function infoNotify(title, description, options)
+    local notifyData = {
+        title = title,
+        description = description,
+        type = "info", 
+        duration = (options and options.duration) or 6000,
+        position = Config.UI and Config.UI.notificationPosition or "center-right",
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    }
+    
+    lib.notify(notifyData)
+    return true
+end
+
+-- Universal warning notification
+local function warningNotify(title, description, options)
+    local notifyData = {
+        title = title,
+        description = description,
+        type = "warning",
+        duration = (options and options.duration) or 7000,
+        position = Config.UI and Config.UI.notificationPosition or "center-right",
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    }
+    
+    lib.notify(notifyData)
+    return true
+end
+
+-- Universal system notification
+local function systemNotify(title, description, options)
+    return infoNotify(title, description, options)
+end
+
+-- Universal vehicle notification (styled for delivery system)
+local function vehicleNotify(title, description, options)
+    local notifyData = {
+        title = "🚛 " .. title,
+        description = description,
+        type = "info",
+        duration = (options and options.duration) or 6000,
+        position = Config.UI and Config.UI.notificationPosition or "center-right",
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    }
+    
+    lib.notify(notifyData)
+    return true
+end
+
+-- Universal achievement notification
+local function achievementNotify(title, description, options)
+    local notifyData = {
+        title = "🏆 " .. title,
+        description = description,
+        type = "success",
+        duration = (options and options.duration) or 10000,
+        position = Config.UI and Config.UI.notificationPosition or "center-right",
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    }
+    
+    lib.notify(notifyData)
+    return true
+end
+
+-- Universal ox_target box zone creation
+local function createBoxZone(config)
+    if not config.coords or not config.options then
+        print("[ERROR] createBoxZone: Missing required config")
+        return false
+    end
+    
+    -- Generate unique zone name if not provided
+    local zoneName = config.name or ("supply_zone_" .. math.random(1000000, 9999999))
+    
+    -- ✅ FIXED: Use correct ox_target API with proper error handling
+    local success, result = pcall(function()
+        return exports.ox_target:addBoxZone({
+            coords = config.coords,
+            size = config.size or vector3(2.0, 2.0, 2.0),
+            rotation = config.rotation or 0,
+            debug = config.debug or false,
+            options = config.options,
+            distance = config.distance or 2.5
+        })
+    end)
+    
+    if success then
+        print("[TARGET] Created box zone: " .. zoneName)
+        return zoneName
+    else
+        print("[ERROR] Failed to create box zone: " .. zoneName .. " - " .. tostring(result))
+        return false
+    end
+end
+
+-- Universal progress bar
+local function showProgress(config)
+    if not config then return false end
+    
+    return lib.progressBar({
+        duration = config.duration or 5000,
+        label = config.label or "Processing...",
+        useWhileDead = config.useWhileDead or false,
+        canCancel = config.canCancel or false,
+        disable = config.disable or {
+            move = false,
+            car = false,
+            combat = true
+        },
+        anim = config.anim
+    })
+end
+
+-- Universal input dialog
+local function showInput(title, fields)
+    return lib.inputDialog(title, fields)
+end
+
+-- Universal confirmation with notification
+local function confirmWithNotification(config)
+    lib.alertDialog({
+        header = config.title or "Confirm Action",
+        content = config.message or "Are you sure?",
+        centered = true,
+        cancel = true
+    }):next(function(confirmed)
+        if confirmed and config.onConfirm then
+            config.onConfirm()
+            if config.successMessage then
+                successNotify("Confirmed", config.successMessage)
+            end
+        elseif not confirmed and config.onCancel then
+            config.onCancel()
+        end
+    end)
+end
+
+-- Universal money formatting
+local function formatMoney(amount)
+    if not amount or amount == 0 then return "0" end
+    
+    local formatted = tostring(math.floor(amount))
+    local k
+    while true do
+        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
+        if k == 0 then break end
+    end
+    return formatted
+end
+
+-- Universal time formatting  
+local function formatTime(seconds)
+    if not seconds or seconds < 0 then return "00:00" end
+    
+    local mins = math.floor(seconds / 60)
+    local secs = seconds % 60
+    return string.format("%02d:%02d", mins, secs)
+end
+
+-- Show access denied message
+local function showAccessDenied(feature, customMessage)
+    local messages = Config.AccessDeniedMessages or {}
+    local message = customMessage or messages[feature] or 
+        "🚫 Access denied - insufficient permissions"
+    
+    errorNotify("Access Denied", message)
+    return false
+end
+
+-- Container calculation helper (from shared utilities)
+local function calculateDeliveryBoxes(orders)
+    return SupplyUtils.calculateDeliveryBoxes(orders)
+end
+
+-- Build warehouse interaction (missing export)
+local function buildWarehouseInteraction(warehouseId)
+    -- Simple warehouse interaction builder
+    return {
+        {
+            name = "warehouse_access_" .. warehouseId,
+            icon = "fas fa-warehouse",
+            label = "Access Warehouse",
+            onSelect = function()
+                TriggerEvent("warehouse:openMenu", warehouseId)
+            end
+        }
+    }
+end
 
 -- ============================================
 -- CORE INITIALIZATION
@@ -47,34 +303,11 @@ AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
     Citizen.SetTimeout(1000, function()
         initializeCoreSystem()
         
-        -- Use notification system
-        local notifySuccess = exports.ogz_supplychain:successNotify(
+        successNotify(
             "System Ready",
             "Supply Chain system loaded successfully!"
         )
-        
-        if not notifySuccess then
-            -- Fallback notification if export isn't ready yet
-            lib.notify({
-                title = "✅ System Ready",
-                description = "Supply Chain system loaded successfully!",
-                type = "success",
-                duration = 5000,
-                position = Config.UI and Config.UI.notificationPosition or "center-right"
-            })
-        end
     end)
-end)
-
--- ============================================
--- LEGACY EVENT HANDLERS
--- ============================================
-
--- Legacy leaderboard handler (now delegated to specialized system)
-RegisterNetEvent("warehouse:showLeaderboard")
-AddEventHandler("warehouse:showLeaderboard", function(leaderboard)
-    -- This is now handled in cl_events.lua, but kept for compatibility
-    print("[CORE] Leaderboard event received, delegating to events system")
 end)
 
 -- ============================================
@@ -135,10 +368,9 @@ AddEventHandler('QBCore:Client:OnJobUpdate', function(JobInfo)
         CoreState.currentOrder = {}
         CoreState.currentOrderRestaurantId = nil
         
-        exports.ogz_supplychain:systemNotify(
+        systemNotify(
             "Job Changed",
-            "Current order cleared due to job change",
-            { duration = 3000 }
+            "Current order cleared due to job change"
         )
     end
 end)
@@ -193,7 +425,8 @@ RegisterCommand('supplycorestate', function()
 end, false)
 
 -- ============================================
--- EXPORTS
+-- UNIVERSAL EXPORTS
+-- These are called throughout the entire system
 -- ============================================
 
 -- Core state exports
@@ -203,13 +436,31 @@ exports('markDeliveryCompleted', markDeliveryCompleted)
 exports('isDeliveryCooldownActive', isDeliveryCooldownActive)
 exports('getCoreState', function() return CoreState end)
 
--- Legacy compatibility exports
-exports('validatePlayerAccess', function(feature)
-    return exports.ogz_supplychain:validatePlayerAccess(feature)
-end)
+-- Universal system exports
+exports('validatePlayerAccess', validatePlayerAccess)
+exports('showAccessDenied', showAccessDenied)
 
-exports('showAccessDenied', function(feature, customMessage)
-    return exports.ogz_supplychain:showAccessDenied(feature, customMessage)
-end)
+-- Universal notification exports
+exports('successNotify', successNotify)
+exports('errorNotify', errorNotify)
+exports('infoNotify', infoNotify)
+exports('warningNotify', warningNotify)
+exports('systemNotify', systemNotify)
+exports('vehicleNotify', vehicleNotify)
+exports('achievementNotify', achievementNotify)
+
+-- Universal UI exports
+exports('createBoxZone', createBoxZone)
+exports('showProgress', showProgress)
+exports('showInput', showInput)
+exports('confirmWithNotification', confirmWithNotification)
+
+-- Universal utility exports
+exports('formatMoney', formatMoney)
+exports('formatTime', formatTime)
+exports('calculateDeliveryBoxes', calculateDeliveryBoxes)
+
+-- Warehouse system exports
+exports('buildWarehouseInteraction', buildWarehouseInteraction)
 
 print("[CORE] Main system loaded - Enterprise Edition")
