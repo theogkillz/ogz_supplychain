@@ -163,9 +163,9 @@ AddEventHandler("warehouse:spawnVehiclesWithAchievements", function(restaurantId
         setupDeliveryVehicle(vehicle, vehicleModel)
         
         -- Apply achievement-based modifications
-        if exports.ogz_supplychain:applyAchievementMods then
-            exports.ogz_supplychain:applyAchievementMods(vehicle, achievementTier)
-        end
+        if exports.ogz_supplychain.applyAchievementMods then
+    exports.ogz_supplychain:applyAchievementMods(vehicle, achievementTier)
+end
         
         -- Enhanced notification for achievement vehicles
         local tierInfo = Config.AchievementVehicles and 

@@ -1,0 +1,19 @@
+{
+    "Lua.diagnostics.globals": [
+        "exports", "TriggerEvent", "TriggerServerEvent", "TriggerClientEvent",
+        "RegisterNetEvent", "AddEventHandler", "QBCore", "GetCurrentResourceName",
+        "source", "GetPlayerPed", "PlayerPedId", "GetEntityCoords", "DoesEntityExist",
+        "lib", "Config", "Wait", "Citizen", "GetHashKey", "RequestModel",
+        "HasModelLoaded", "CreateVehicle", "SetEntityAsMissionEntity",
+        "SetVehicleHasBeenOwnedByPlayer", "SetVehicleNeedsToBeHotwired",
+        "SetVehRadioStation", "SetVehicleEngineOn", "SetEntityCleanupByEngine",
+        "GetVehicleNumberPlateText", "DoScreenFadeOut", "DoScreenFadeIn",
+        "SetEntityCoords", "GetGameTimer", "DeleteVehicle", "GetGamePool",
+        "GetVehiclePedIsIn", "GetGroundZFor_3dCoord", "vector3", "vector4",
+        "string", "math", "table", "pairs", "ipairs", "print", "tostring",
+        "tonumber", "type", "next", "assert", "error", "pcall", "xpcall"
+    ],
+    "Lua.diagnostics.disable": [
+        "lowercase-global"
+    ]
+}
