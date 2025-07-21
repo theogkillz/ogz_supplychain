@@ -64,7 +64,7 @@ AddEventHandler("seller:openSellMenu", function()
         return
     end
 
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     local items = PlayerData.items
     local itemNames = exports.ox_inventory:Items() or {}
     local options = {}

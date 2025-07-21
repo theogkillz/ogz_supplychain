@@ -390,45 +390,6 @@ if Config.Restaurants then
 end
 
 -- ===============================================
--- RESTAURANT OWNERSHIP VALIDATION FUNCTIONS
--- ===============================================
-
--- Enhanced job validation (extends your existing Config.JobValidation)
-Config.JobValidation.validateRestaurantOwnership = function(playerId, restaurantId)
-    return {
-        isOwner = false,        -- Will be set by server callback
-        isStaff = false,        -- Will be set by server callback
-        position = "none",      -- Will be set by server callback
-        permissions = {}        -- Will be set by server callback
-    }
-end
-
--- Restaurant access validation (extends existing system)
-Config.JobValidation.validateRestaurantAccess = function(playerId, restaurantId, requiredPermission)
-    -- ✅ PROPER: Use the bridge layer exports that work with both frameworks
-    local player = exports['qb-core']:GetPlayerData(playerId) -- Works with both QBCore and QBox bridge
-    if not player or not player.PlayerData or not player.PlayerData.job then
-        return false, "none"
-    end
-    
-    local playerJob = player.PlayerData.job.name
-    local restaurantJob = Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].job
-    
-    -- Check traditional job access
-    if playerJob == restaurantJob then
-        return true, "employee"
-    end
-    
-    -- Check admin/management access
-    if playerJob == "admin" or playerJob == "god" then
-        return true, "admin"
-    end
-    
-    -- TODO: Check ownership/staff access (will use server callback in future)
-    return false, "none"
-end
-
--- ===============================================
 -- INTEGRATION HOOKS
 -- ===============================================
 
@@ -500,29 +461,53 @@ if Config.Notifications then
     }
 end
 
--- ✅ PROPER: Helper functions that work with both frameworks
-function GetPlayerJobName()
-    -- Works on client-side with both frameworks via bridge
-    local playerData = exports['qb-core']:GetPlayerData() -- Bridge compatibility
-    return (playerData and playerData.job and playerData.job.name) or "unemployed"
+-- At the bottom of config_restaurants.lua, REPLACE the helper functions with:
+
+-- ===============================================
+-- RESTAURANT OWNERSHIP VALIDATION FUNCTIONS
+-- ===============================================
+
+-- Enhanced job validation (extends your existing Config.JobValidation)
+Config.JobValidation.validateRestaurantOwnership = function(playerId, restaurantId)
+    -- This will be handled by server callbacks
+    return {
+        isOwner = false,        -- Will be set by server callback
+        isStaff = false,        -- Will be set by server callback
+        position = "none",      -- Will be set by server callback
+        permissions = {}        -- Will be set by server callback
+    }
 end
 
-function HasJobAccess(requiredJobs)
-    if not requiredJobs then return true end
-    
-    local playerJob = GetPlayerJobName()
-    
-    if type(requiredJobs) == "string" then
-        return playerJob == requiredJobs
-    elseif type(requiredJobs) == "table" then
-        for _, job in ipairs(requiredJobs) do
-            if playerJob == job then
-                return true
-            end
-        end
+-- Restaurant access validation (extends existing system)
+Config.JobValidation.validateRestaurantAccess = function(playerId, restaurantId, requiredPermission)
+    -- This function should only be called from server-side
+    -- Client-side should use Framework.HasJob() from the framework bridge
+    if not IsDuplicityVersion() then
+        print("[WARNING] validateRestaurantAccess called on client - use Framework.HasJob() instead")
+        return false, "none"
     end
     
-    return false
+    -- Server-side implementation
+    local player = Framework.GetPlayer(playerId)
+    if not player or not player.PlayerData or not player.PlayerData.job then
+        return false, "none"
+    end
+    
+    local playerJob = player.PlayerData.job.name
+    local restaurantJob = Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].job
+    
+    -- Check traditional job access
+    if playerJob == restaurantJob then
+        return true, "employee"
+    end
+    
+    -- Check admin/management access
+    if playerJob == "admin" or playerJob == "god" then
+        return true, "admin"
+    end
+    
+    -- TODO: Check ownership/staff access (will use server callback in future)
+    return false, "none"
 end
 
 print("^2[OGZ-SupplyChain]^7 Restaurant Ownership Configuration Loaded!")

@@ -1,6 +1,6 @@
 -- Job validation for vehicle ownership
 local function hasVehicleOwnershipAccess()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     if not PlayerData or not PlayerData.job then
         return false
     end
@@ -13,7 +13,7 @@ end
 RegisterNetEvent("vehicles:openDealership")
 AddEventHandler("vehicles:openDealership", function()
     if not hasVehicleOwnershipAccess() then
-        local PlayerData = QBCore.Functions.GetPlayerData()
+        local playerData = QBX.PlayerData
         local currentJob = PlayerData and PlayerData.job and PlayerData.job.name or "unemployed"
         
         lib.notify({

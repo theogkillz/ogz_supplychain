@@ -5,6 +5,7 @@
 
 local QBCore = exports['qb-core']:GetCoreObject()
 
+
 -- ============================================
 -- STATE MANAGEMENT
 -- ============================================
@@ -24,7 +25,7 @@ local containerState = {
 
 -- Get player's restaurant ID based on job
 local function getPlayerRestaurantId()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = playerdata.job
     if not PlayerData or not PlayerData.job then
         return nil
     end
@@ -45,7 +46,7 @@ end
 
 -- Get player's job access level
 local function getPlayerJobAccess()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = playerdata.job
     if not PlayerData or not PlayerData.job then
         return "none"
     end

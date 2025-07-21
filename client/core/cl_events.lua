@@ -4,6 +4,9 @@
 -- ============================================
 
 local QBCore = exports['qb-core']:GetCoreObject()
+-- Import QBox modules
+local playerdata = require '@qbx_core.modules.playerdata'
+local lib = require '@qbx_core.modules.lib'
 
 -- ============================================
 -- UNIVERSAL CLIENT VALIDATION SYSTEM
@@ -11,12 +14,12 @@ local QBCore = exports['qb-core']:GetCoreObject()
 
 -- Universal client validation
 local function validatePlayerAccess(feature)
-    local PlayerData = QBCore.Functions.GetPlayerData()
-    if not PlayerData or not PlayerData.job then
+    local playerData = playerdata.job
+    if not playerData or not playerData.job then
         return false, "No job data available"
     end
     
-    local playerJob = PlayerData.job.name
+    local playerJob = playerData.job.name
     local currentJob = playerJob or "unemployed"
     
     -- Use config validation
@@ -45,8 +48,8 @@ end
 
 -- Universal access denied notification
 local function showAccessDenied(feature, customMessage)
-    local PlayerData = QBCore.Functions.GetPlayerData()
-    local currentJob = PlayerData and PlayerData.job and PlayerData.job.name or "unemployed"
+    local playerData = playerdata.job
+    local currentJob = playerData and playerData.job and playerData.job.name or "unemployed"
     
     local message = customMessage or Config.JobValidation.getAccessDeniedMessage(feature, currentJob)
     

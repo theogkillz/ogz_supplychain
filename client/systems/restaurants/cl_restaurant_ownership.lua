@@ -240,7 +240,7 @@ function getRestaurantAccessLevel(restaurantId)
     end
     
     -- Check traditional job access
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     local PlayerJob = PlayerData.job
     local restaurantJob = Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].job
     

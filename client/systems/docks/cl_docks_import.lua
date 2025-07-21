@@ -172,7 +172,7 @@ end)
 -- ===============================================
 
 function checkPortManagementAccess()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     if not PlayerData then return false end
     
     return PlayerData.job.name == "dockworker" and PlayerData.job.isboss or
@@ -180,7 +180,7 @@ function checkPortManagementAccess()
 end
 
 function checkImportOrderAccess()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     if not PlayerData then return false end
     
     return PlayerData.job.name == "dockworker" or
@@ -188,7 +188,7 @@ function checkImportOrderAccess()
 end
 
 function checkDockWorkerAccess()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     if not PlayerData then return false end
     
     return Config.JobValidation.validateDockWorkerAccess(PlayerData.job.name)

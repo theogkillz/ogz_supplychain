@@ -11,7 +11,7 @@ local QBCore = exports['qb-core']:GetCoreObject()
 
 -- Job validation helper function
 local function hasWarehouseAccess()
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     if not PlayerData or not PlayerData.job then
         return false
     end

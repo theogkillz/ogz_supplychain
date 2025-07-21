@@ -139,7 +139,7 @@ AddEventHandler("restaurant:openMainMenu", function(data)
             openStaffMainMenu(restaurantId, ownershipData)
         else
             -- Check traditional job access
-            local PlayerData = QBCore.Functions.GetPlayerData()
+            local playerData = QBX.PlayerData
             local PlayerJob = PlayerData.job
             local restaurantJob = Config.Restaurants[restaurantId].job
             
@@ -273,7 +273,7 @@ end
 
 -- Employee main menu (traditional job system)
 function openEmployeeMainMenu(restaurantId)
-    local PlayerData = QBCore.Functions.GetPlayerData()
+    local playerData = QBX.PlayerData
     local isBoss = PlayerData.job and PlayerData.job.isboss
     
     local options = {

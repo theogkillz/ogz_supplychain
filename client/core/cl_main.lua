@@ -1,9 +1,12 @@
 -- ============================================
 -- CORE MAIN SYSTEM - ENTERPRISE EDITION
 -- Universal export functions + core state management
+-- QBox Framework Compatible Version
 -- ============================================
 
-local QBCore = exports['qb-core']:GetCoreObject()
+-- Import QBox modules
+local playerdata = require '@qbx_core.modules.playerdata'
+local lib = require '@qbx_core.modules.lib'
 
 -- ============================================
 -- CORE VARIABLES
@@ -15,7 +18,6 @@ local CoreState = {
     currentOrderRestaurantId = nil,
     lastDeliveryTime = 0,
     deliveryCooldown = 300000, -- 5 minutes in milliseconds
-    playerData = nil
 }
 
 -- ============================================
@@ -25,16 +27,14 @@ local CoreState = {
 
 -- Universal job validation
 local function validatePlayerAccess(feature)
-    -- ✅ PROPER: Use bridge layer exports that work with both frameworks
-    local playerData = exports['qb-core']:GetPlayerData() -- Works with both QBCore and QBox bridge
+    -- ✅ PROPER QBox: Use playerdata module
+    local playerJob = playerdata.job and playerdata.job.name
     
-    -- ✅ CRITICAL: Ensure we have valid player data and ALWAYS return boolean
-    if not playerData or not playerData.job or not playerData.job.name then
-        print("[ACCESS] No valid player data for feature: " .. tostring(feature))
+    -- ✅ CRITICAL: Ensure we ALWAYS return boolean
+    if not playerJob then
+        print("[ACCESS] No valid player job for feature: " .. tostring(feature))
         return false -- Always return boolean, never nil
     end
-    
-    local playerJob = playerData.job.name
     
     -- Define job access per feature
     local accessRules = {
@@ -308,9 +308,6 @@ local function initializeCoreSystem()
         return
     end
     
-    -- Get player data
-    CoreState.playerData = QBCore.Functions.GetPlayerData()
-    
     -- Mark as initialized
     CoreState.initialized = true
     
@@ -320,9 +317,21 @@ local function initializeCoreSystem()
     print("[CORE] Supply Chain core system initialized")
 end
 
--- Handle player loaded
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded')
-AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
+-- Handle player loaded (QBox pattern)
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    -- Small delay to ensure everything is loaded
+    Citizen.SetTimeout(1000, function()
+        initializeCoreSystem()
+        
+        successNotify(
+            "System Ready",
+            "Supply Chain system loaded successfully!"
+        )
+    end)
+end)
+
+-- Also handle QBox player loaded event
+RegisterNetEvent('qbx:playerLoaded', function()
     -- Small delay to ensure everything is loaded
     Citizen.SetTimeout(1000, function()
         initializeCoreSystem()
@@ -378,24 +387,31 @@ end
 -- PLAYER STATE MONITORING
 -- ============================================
 
--- Monitor player job changes
-RegisterNetEvent('QBCore:Client:OnJobUpdate')
-AddEventHandler('QBCore:Client:OnJobUpdate', function(JobInfo)
-    if CoreState.playerData then
-        CoreState.playerData.job = JobInfo
-    end
+-- Monitor player job changes (QBox pattern)
+CreateThread(function()
+    local currentJob = playerdata.job and playerdata.job.name
     
-    print("[CORE] Job updated to: " .. (JobInfo.name or "unemployed"))
-    
-    -- Clear current order if job changed
-    if CoreState.currentOrder and next(CoreState.currentOrder) ~= nil then
-        CoreState.currentOrder = {}
-        CoreState.currentOrderRestaurantId = nil
+    while true do
+        Wait(1000) -- Check every second
         
-        systemNotify(
-            "Job Changed",
-            "Current order cleared due to job change"
-        )
+        local newJob = playerdata.job and playerdata.job.name
+        
+        if newJob ~= currentJob then
+            currentJob = newJob
+            
+            print("[CORE] Job updated to: " .. (currentJob or "unemployed"))
+            
+            -- Clear current order if job changed
+            if CoreState.currentOrder and next(CoreState.currentOrder) ~= nil then
+                CoreState.currentOrder = {}
+                CoreState.currentOrderRestaurantId = nil
+                
+                systemNotify(
+                    "Job Changed",
+                    "Current order cleared due to job change"
+                )
+            end
+        end
     end
 end)
 
@@ -410,7 +426,7 @@ AddEventHandler('onResourceStart', function(resourceName)
         
         -- Small delay to ensure dependencies are loaded
         Citizen.SetTimeout(2000, function()
-            if QBCore.Functions.GetPlayerData() then
+            if playerdata.citizenid then -- Check if player data is loaded
                 initializeCoreSystem()
             end
         end)
@@ -433,11 +449,12 @@ end)
 RegisterCommand('supplycorestate', function()
     local state = getPlayerState()
     local stateText = string.format(
-        "**Core State:**\n• Initialized: %s\n• Has Order: %s\n• Restaurant ID: %s\n• Cooldown: %d seconds",
+        "**Core State:**\n• Initialized: %s\n• Has Order: %s\n• Restaurant ID: %s\n• Cooldown: %d seconds\n• Current Job: %s",
         tostring(state.initialized),
         tostring(state.hasOrder),
         tostring(state.restaurantId or "None"),
-        math.floor(state.cooldownRemaining / 1000)
+        math.floor(state.cooldownRemaining / 1000),
+        tostring(playerdata.job and playerdata.job.name or "None")
     )
     
     lib.alertDialog({
@@ -507,4 +524,4 @@ end)
 
 print("[CORE] ✅ Client-side notification handler registered")
 
-print("[CORE] Main system loaded - Enterprise Edition")
+print("[CORE] Main system loaded - Enterprise Edition (QBox Compatible)")
