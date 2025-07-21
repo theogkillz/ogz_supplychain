@@ -1,7 +1,7 @@
 fx_version 'cerulean'
 game 'gta5'
 
-author 'VirgilDev - Rewritten by The OG KiLLz'
+author 'The OG KiLLz'
 description 'OGz_SupplyChainMaster - The Ultimate Supply Chain/Business Script'
 version '1.0.1'
 
