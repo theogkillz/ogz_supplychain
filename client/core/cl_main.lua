@@ -25,24 +25,36 @@ local CoreState = {
 
 -- Universal job validation
 local function validatePlayerAccess(feature)
-    local playerData = QBCore.Functions.GetPlayerData()
-    if not playerData or not playerData.job then
-
-        return false
+    -- ✅ PROPER: Use bridge layer exports that work with both frameworks
+    local playerData = exports['qb-core']:GetPlayerData() -- Works with both QBCore and QBox bridge
+    
+    -- ✅ CRITICAL: Ensure we have valid player data and ALWAYS return boolean
+    if not playerData or not playerData.job or not playerData.job.name then
+        print("[ACCESS] No valid player data for feature: " .. tostring(feature))
+        return false -- Always return boolean, never nil
     end
     
     local playerJob = playerData.job.name
     
     -- Define job access per feature
     local accessRules = {
-        warehouse = {"hurst"},
-        delivery = {"hurst"}, 
-        manufacturing = {"hurst"},
+        warehouse = {"hurst", "admin", "god"},
+        delivery = {"hurst", "admin", "god"}, 
+        manufacturing = {"hurst", "admin", "god"},
         restaurant = {"all"}, -- Handled per-restaurant in business logic
-        admin = {"admin", "god"}
+        admin = {"admin", "god"},
+        achievements = {"hurst", "admin", "god"},
+        npc = {"hurst", "admin", "god"},
+        vehicle = {"hurst", "admin", "god"},
+        container = {"hurst", "admin", "god"}
     }
     
     local allowedJobs = accessRules[feature] or {"hurst"}
+    
+    -- Special case: "all" means any job is allowed
+    if allowedJobs[1] == "all" then
+        return true
+    end
     
     -- Check if job is allowed
     for _, job in ipairs(allowedJobs) do
@@ -51,6 +63,7 @@ local function validatePlayerAccess(feature)
         end
     end
     
+    -- ✅ CRITICAL: ALWAYS return boolean - never nil
     return false
 end
 

@@ -405,7 +405,13 @@ end
 
 -- Restaurant access validation (extends existing system)
 Config.JobValidation.validateRestaurantAccess = function(playerId, restaurantId, requiredPermission)
-    local playerJob = GetPlayerJob(playerId) -- Your existing function
+    -- ✅ PROPER: Use the bridge layer exports that work with both frameworks
+    local player = exports['qb-core']:GetPlayer(playerId) -- Works with both QBCore and QBox bridge
+    if not player or not player.PlayerData or not player.PlayerData.job then
+        return false, "none"
+    end
+    
+    local playerJob = player.PlayerData.job.name
     local restaurantJob = Config.Restaurants[restaurantId] and Config.Restaurants[restaurantId].job
     
     -- Check traditional job access
@@ -413,17 +419,12 @@ Config.JobValidation.validateRestaurantAccess = function(playerId, restaurantId,
         return true, "employee"
     end
     
-    -- Check ownership/staff access (will use server callback)
-    local ownershipData = Config.JobValidation.validateRestaurantOwnership(playerId, restaurantId)
-    
-    if ownershipData.isOwner then
-        return true, "owner"
-    elseif ownershipData.isStaff then
-        if not requiredPermission or table.contains(ownershipData.permissions, requiredPermission) then
-            return true, ownershipData.position
-        end
+    -- Check admin/management access
+    if playerJob == "admin" or playerJob == "god" then
+        return true, "admin"
     end
     
+    -- TODO: Check ownership/staff access (will use server callback in future)
     return false, "none"
 end
 
@@ -497,6 +498,31 @@ if Config.Notifications then
             low_profit = "📉 Restaurant profits below threshold"
         }
     }
+end
+
+-- ✅ PROPER: Helper functions that work with both frameworks
+function GetPlayerJobName()
+    -- Works on client-side with both frameworks via bridge
+    local playerData = exports['qb-core']:GetPlayerData() -- Bridge compatibility
+    return (playerData and playerData.job and playerData.job.name) or "unemployed"
+end
+
+function HasJobAccess(requiredJobs)
+    if not requiredJobs then return true end
+    
+    local playerJob = GetPlayerJobName()
+    
+    if type(requiredJobs) == "string" then
+        return playerJob == requiredJobs
+    elseif type(requiredJobs) == "table" then
+        for _, job in ipairs(requiredJobs) do
+            if playerJob == job then
+                return true
+            end
+        end
+    end
+    
+    return false
 end
 
 print("^2[OGZ-SupplyChain]^7 Restaurant Ownership Configuration Loaded!")
