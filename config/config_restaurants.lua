@@ -406,7 +406,7 @@ end
 -- Restaurant access validation (extends existing system)
 Config.JobValidation.validateRestaurantAccess = function(playerId, restaurantId, requiredPermission)
     -- ✅ PROPER: Use the bridge layer exports that work with both frameworks
-    local player = exports['qb-core']:GetPlayer(playerId) -- Works with both QBCore and QBox bridge
+    local player = exports['qb-core']:GetPlayerData(playerId) -- Works with both QBCore and QBox bridge
     if not player or not player.PlayerData or not player.PlayerData.job then
         return false, "none"
     end
