@@ -1,4 +1,3 @@
--- client/systems/warehouse/cl_warehouse_zones.lua
 -- Warehouse Zones and Menu System
 
 local Framework = SupplyChain.Framework
@@ -29,6 +28,23 @@ CreateThread(function()
                         groups = Config.Warehouse.jobAccess,
                         onSelect = function()
                             OpenWarehouseMenu()
+                        end
+                    },
+                    {
+                        name = "warehouse_containers_" .. warehouseId,
+                        icon = "fas fa-cube",
+                        label = "Container Rental",
+                        onSelect = function()
+                            TriggerEvent(Constants.Events.Client.ShowContainerMenu)
+                        end
+                    },
+                    {
+                        name = "warehouse_emergency_" .. warehouseId,
+                        icon = "fas fa-exclamation-triangle",
+                        label = "Emergency Orders",
+                        groups = Config.Warehouse.jobAccess,
+                        onSelect = function()
+                            exports['ogz_supplychain']:OpenEmergencyOrdersMenu()
                         end
                     }
                 }
@@ -85,6 +101,31 @@ function OpenWarehouseMenu()
             icon = "fas fa-box",
             onSelect = function()
                 Warehouse.OpenMainMenu()
+            end
+        },
+        {
+            title = "Emergency Orders",
+            description = "View critical supply needs",
+            icon = "fas fa-exclamation-triangle",
+            iconColor = "red",
+            onSelect = function()
+                exports['ogz_supplychain']:OpenEmergencyOrdersMenu()
+            end
+        },
+        {
+            title = "Market Report",
+            description = "View current market prices and trends",
+            icon = "fas fa-chart-line",
+            onSelect = function()
+                TriggerServerEvent("SupplyChain:Server:GetMarketReport")
+            end
+        },
+        {
+            title = "Container Rental",
+            description = "Rent specialized containers",
+            icon = "fas fa-cube",
+            onSelect = function()
+                TriggerEvent(Constants.Events.Client.ShowContainerMenu)
             end
         },
         {

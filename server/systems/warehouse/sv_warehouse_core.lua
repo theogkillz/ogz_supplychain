@@ -443,6 +443,39 @@ function LogDeliveryCompletion(playerId, delivery, reward, time)
     })
 end
 
+-- Check delivery achievements
+function CheckDeliveryAchievements(playerId, delivery, deliveryTime, boxCount, teamSize)
+    -- Check delivery count achievements
+    exports['ogz_supplychain']:CheckAchievementProgress(playerId, "delivery_count", nil)
+    
+    -- Check speed achievements
+    if deliveryTime then
+        exports['ogz_supplychain']:CheckAchievementProgress(playerId, "delivery_time", deliveryTime)
+    end
+    
+    -- Check team achievements
+    if teamSize and teamSize > 1 then
+        exports['ogz_supplychain']:CheckAchievementProgress(playerId, "team_deliveries", nil)
+    end
+    
+    -- Check quality achievements (assuming 100% for now)
+    exports['ogz_supplychain']:CheckAchievementProgress(playerId, "perfect_deliveries", nil)
+    
+    -- Check time-based achievements
+    local hour = os.date("*t").hour
+    if hour >= 22 or hour < 6 then
+        exports['ogz_supplychain']:CheckAchievementProgress(playerId, "night_deliveries", nil)
+    elseif hour >= 6 and hour < 12 then
+        exports['ogz_supplychain']:CheckAchievementProgress(playerId, "morning_deliveries", nil)
+    end
+    
+    -- Check weekend deliveries
+    local dayOfWeek = os.date("*t").wday
+    if dayOfWeek == 1 or dayOfWeek == 7 then
+        exports['ogz_supplychain']:CheckAchievementProgress(playerId, "weekend_deliveries", nil)
+    end
+end
+
 -- Export functions
 exports('GetActiveDeliveries', function()
     return activeDeliveries
