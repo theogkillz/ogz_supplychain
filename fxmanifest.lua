@@ -55,9 +55,9 @@ server_scripts {
     'server/systems/restaurants/sv_restaurant_finances.lua', -- NEW financial tracking
     
     -- Warehouse System  
-    'server/systems/warehouse/sv_warehouse_core.lua',        -- Migrated from sv_warehouse.lua
-    'server/systems/warehouse/sv_warehouse_orders.lua',      -- NEW extracted logic
-    'server/systems/warehouse/sv_warehouse_containers.lua',  -- Migrated from sv_warehouse_containers.lua
+    'server/systems/warehouses/sv_warehouse_core.lua',        -- Migrated from sv_warehouse.lua
+    'server/systems/warehouses/sv_warehouse_orders.lua',      -- NEW extracted logic
+    'server/systems/warehouses/sv_warehouse_containers.lua',  -- Migrated from sv_warehouse_containers.lua
     
     -- NEW Docks Import System
     -- 'server/systems/docks/sv_docks_core.lua',               -- NEW docks management

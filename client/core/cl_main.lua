@@ -159,21 +159,21 @@ local function createBoxZone(config)
     -- Generate unique zone name if not provided
     local zoneName = config.name or ("supply_zone_" .. math.random(1000000, 9999999))
     
-    -- ✅ FIXED: Use correct ox_target API with proper error handling
+    -- ✅ FIXED: Use correct ox_target API with proper structure
     local success, result = pcall(function()
         return exports.ox_target:addBoxZone({
+            name = zoneName, -- ✅ FIXED: Include the zone name in the config
             coords = config.coords,
             size = config.size or vector3(2.0, 2.0, 2.0),
             rotation = config.rotation or 0,
             debug = config.debug or false,
-            options = config.options,
-            distance = config.distance or 2.5
+            options = config.options -- ✅ FIXED: Distance is handled in each option, not here
         })
     end)
     
     if success then
         print("[TARGET] Created box zone: " .. zoneName)
-        return zoneName
+        return result -- ✅ FIXED: Return the actual zone ID from ox_target
     else
         print("[ERROR] Failed to create box zone: " .. zoneName .. " - " .. tostring(result))
         return false
@@ -260,15 +260,26 @@ local function calculateDeliveryBoxes(orders)
 end
 
 -- Build warehouse interaction (missing export)
-local function buildWarehouseInteraction(warehouseId)
-    -- Simple warehouse interaction builder
+local function buildWarehouseInteraction(warehouseId, config)
+    -- Handle both old single-parameter and new dual-parameter calls
+    local options = config or {}
+    local label = options.label or "Access Warehouse"
+    local jobs = options.jobs or Config.Jobs.warehouse
+    
     return {
         {
             name = "warehouse_access_" .. warehouseId,
             icon = "fas fa-warehouse",
-            label = "Access Warehouse",
+            label = label,
+            groups = jobs, -- ✅ FIXED: Use 'groups' for job restrictions in ox_target
+            distance = 2.5, -- ✅ FIXED: Distance should be in each option, not at zone level
             onSelect = function()
-                TriggerEvent("warehouse:openMenu", warehouseId)
+                -- Validate access before opening menu
+                if exports.ogz_supplychain:validatePlayerAccess("warehouse") then
+                    TriggerEvent("warehouse:openProcessingMenu")
+                else
+                    exports.ogz_supplychain:showAccessDenied("warehouse")
+                end
             end
         }
     }
@@ -462,5 +473,25 @@ exports('calculateDeliveryBoxes', calculateDeliveryBoxes)
 
 -- Warehouse system exports
 exports('buildWarehouseInteraction', buildWarehouseInteraction)
+
+-- ============================================
+-- CLIENT-SIDE NOTIFICATION HANDLER
+-- Properly handle server-side notifications using ox_lib
+-- ============================================
+
+-- Handle server-side notifications properly
+RegisterNetEvent('ogz_supplychain:notify')
+AddEventHandler('ogz_supplychain:notify', function(data)
+    lib.notify({
+        title = data.title,
+        description = data.description,
+        type = data.type or 'info',
+        duration = data.duration or 5000,
+        position = Config.UI and Config.UI.notificationPosition or 'center-right',
+        markdown = Config.UI and Config.UI.enableMarkdown or true
+    })
+end)
+
+print("[CORE] ✅ Client-side notification handler registered")
 
 print("[CORE] Main system loaded - Enterprise Edition")
