@@ -102,10 +102,11 @@ server_scripts {
 -- CLIENT SCRIPTS (Organized by System)  
 client_scripts {
     -- 1. CORE SYSTEMS (Foundation - Load First)
+    'client/core/cl_init.lua',
     'client/core/cl_main.lua',
-    'client/utils/cl_job_utils.lua',
     'client/core/cl_events.lua', 
     'client/core/cl_ui_manager.lua',
+    'client/utils/cl_job_utils.lua',
     
     -- 3. ACHIEVEMENT SYSTEMS (Load Before Business Logic!)
     'client/systems/achievements/cl_achievements_ui.lua',

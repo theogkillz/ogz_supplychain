@@ -4,6 +4,13 @@
 -- ============================================
 
 local QBCore = exports['qb-core']:GetCoreObject()
+local sessionStart = GetGameTimer() -- Initialize session start time
+local sessionStats = {
+    deliveries = 0,
+    earnings = 0,
+    perfectDeliveries = 0,
+    teamDeliveries = 0
+}
 
 -- Tracking state management
 local activeTracking = {}
@@ -293,7 +300,7 @@ end)
 -- Check for session-based achievement milestones
 RegisterNetEvent("achievements:checkSessionMilestones")
 AddEventHandler("achievements:checkSessionMilestones", function()
-    local sessionTime = (GetGameTimer() - sessionStats.sessionStart) / 1000 / 3600 -- Hours
+    local sessionTime = sessionStart and ((GetGameTimer() - sessionStart) / 1000 / 60) or 0 -- Convert to minutes with nil check
     
     -- Check for session achievements
     if sessionStats.deliveries >= 10 and sessionTime <= 2 then
@@ -484,37 +491,6 @@ AddEventHandler("achievements:resetSessionStats", function()
         sessionStart = GetGameTimer()
     }
     print("[ACHIEVEMENTS] Session stats reset")
-end)
-
--- ============================================
--- DEBUG AND TESTING FUNCTIONS
--- ============================================
-
--- Debug command to show current tracking state
-RegisterCommand('achstats', function()
-    if not exports.ogz_supplychain:validatePlayerAccess("achievements") then
-        return
-    end
-    
-    local sessionTime = (GetGameTimer() - sessionStats.sessionStart) / 1000 / 60 -- Minutes
-    
-    exports.ogz_supplychain:infoNotify(
-        "📊 Session Stats",
-        string.format("Time: %.1fm • Deliveries: %d • Perfect: %d • Team: %d • Manufacturing: %d", 
-            sessionTime, sessionStats.deliveries, sessionStats.perfectDeliveries, 
-            sessionStats.teamDeliveries, sessionStats.manufacturingBatches)
-    )
-end)
-
--- Debug command to test achievement
-RegisterCommand('testach', function(source, args)
-    if not exports.ogz_supplychain:validatePlayerAccess("admin") then
-        return
-    end
-    
-    if args[1] then
-        TriggerServerEvent("achievements:debugTestAchievement", args[1])
-    end
 end)
 
 -- ============================================

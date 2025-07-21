@@ -23,50 +23,25 @@ local containerState = {
 -- PLAYER JOB & ACCESS MANAGEMENT
 -- ============================================
 
--- Get player's restaurant ID based on job
-local function getPlayerRestaurantId()
-    local playerData = playerdata.job
-    if not PlayerData or not PlayerData.job then
-        return nil
-    end
-    
-    local playerJob = PlayerData.job.name
-    
-    -- Map job names to restaurant IDs
-    local jobToRestaurant = {
-        ["burgershot"] = 1,
-        ["pizzathis"] = 2,
-        ["tacobomb"] = 3,
-        ["restaurant"] = 1, -- Generic restaurant job defaults to 1
-        ["hurst"] = nil     -- Warehouse workers don't have a specific restaurant
-    }
-    
-    return jobToRestaurant[playerJob]
-end
-
--- Get player's job access level
 local function getPlayerJobAccess()
-    local playerData = playerdata.job
-    if not PlayerData or not PlayerData.job then
-        return "none"
-    end
+    local playerJob = GetPlayerJobName() -- Global function
     
-    local playerJob = PlayerData.job.name
-    
-    if playerJob == "hurst" then
-        return "warehouse"
-    elseif playerJob == "burgershot" or playerJob == "pizzathis" or playerJob == "tacobomb" or playerJob == "restaurant" then
-        return "restaurant"
-    else
-        return "none"
+    -- Check if player has warehouse/container access
+    local allowedJobs = {"hurst", "admin", "god"}
+    for _, job in ipairs(allowedJobs) do
+        if playerJob == job then
+            return playerJob
+        end
     end
+    print("[CONTAINERS] Player job " .. playerJob .. " does not have container access")
+    return nil
 end
 
--- Check if player has container access
-local function hasContainerAccess()
-    local access = getPlayerJobAccess()
-    return access == "warehouse" or access == "restaurant"
-end
+-- Fix hasContainerAccess export (around line 67)
+exports('hasContainerAccess', function()
+    local job = getPlayerJobAccess()
+    return job ~= nil
+end)
 
 -- ============================================
 -- CONTAINER TYPE & DISPLAY UTILITIES
