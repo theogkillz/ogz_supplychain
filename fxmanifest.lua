@@ -103,6 +103,7 @@ server_scripts {
 client_scripts {
     -- 1. CORE SYSTEMS (Foundation - Load First)
     'client/core/cl_main.lua',
+    'client/utils/cl_job_utils.lua',
     'client/core/cl_events.lua', 
     'client/core/cl_ui_manager.lua',
     

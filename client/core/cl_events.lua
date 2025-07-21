@@ -5,8 +5,8 @@
 
 local QBCore = exports['qb-core']:GetCoreObject()
 -- Import QBox modules
-local playerdata = require '@qbx_core.modules.playerdata'
-local lib = require '@qbx_core.modules.lib'
+local job = Framework.GetPlayerJob()
+local hasAccess = Framework.HasJob("hurst")
 
 -- ============================================
 -- UNIVERSAL CLIENT VALIDATION SYSTEM

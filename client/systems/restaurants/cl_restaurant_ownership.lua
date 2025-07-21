@@ -5,7 +5,8 @@
 -- ===============================================
 
 local QBCore = exports['qb-core']:GetCoreObject()
-
+local job = Framework.GetPlayerJob()
+local hasAccess = Framework.HasJob("hurst")
 -- ===============================================
 -- STATE MANAGEMENT
 -- ===============================================

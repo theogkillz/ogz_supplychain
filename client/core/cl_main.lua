@@ -4,9 +4,39 @@
 -- QBox Framework Compatible Version
 -- ============================================
 
--- Import QBox modules
-local playerdata = require '@qbx_core.modules.playerdata'
-local lib = require '@qbx_core.modules.lib'
+-- QBox playerdata is accessed differently
+local QBX = exports.qbx_core
+local PlayerData = {}
+
+-- ============================================
+-- WAIT FOR PLAYER DATA TO LOAD
+-- ============================================
+CreateThread(function()
+    while true do
+        if LocalPlayer.state.isLoggedIn then
+            PlayerData = QBX:GetPlayerData()
+            break
+        end
+        Wait(100)
+    end
+end)
+
+-- Update PlayerData when it changes
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    PlayerData = QBX:GetPlayerData()
+end)
+
+RegisterNetEvent('qbx:client:playerLoaded', function(data)
+    PlayerData = data
+end)
+
+RegisterNetEvent('QBCore:Client:OnJobUpdate', function(JobInfo)
+    PlayerData.job = JobInfo
+end)
+
+RegisterNetEvent('qbx:client:OnJobUpdate', function(job)
+    PlayerData.job = job
+end)
 
 -- ============================================
 -- CORE VARIABLES
@@ -27,8 +57,8 @@ local CoreState = {
 
 -- Universal job validation
 local function validatePlayerAccess(feature)
-    -- ✅ PROPER QBox: Use playerdata module
-    local playerJob = playerdata.job and playerdata.job.name
+    -- ✅ PROPER QBox: Use PlayerData
+    local playerJob = PlayerData.job and PlayerData.job.name
     
     -- ✅ CRITICAL: Ensure we ALWAYS return boolean
     if not playerJob then
@@ -389,12 +419,12 @@ end
 
 -- Monitor player job changes (QBox pattern)
 CreateThread(function()
-    local currentJob = playerdata.job and playerdata.job.name
+    local currentJob = PlayerData.job and PlayerData.job.name
     
     while true do
         Wait(1000) -- Check every second
         
-        local newJob = playerdata.job and playerdata.job.name
+        local newJob = PlayerData.job and PlayerData.job.name
         
         if newJob ~= currentJob then
             currentJob = newJob
@@ -426,7 +456,7 @@ AddEventHandler('onResourceStart', function(resourceName)
         
         -- Small delay to ensure dependencies are loaded
         Citizen.SetTimeout(2000, function()
-            if playerdata.citizenid then -- Check if player data is loaded
+            if LocalPlayer.state.isLoggedIn then
                 initializeCoreSystem()
             end
         end)
@@ -454,7 +484,7 @@ RegisterCommand('supplycorestate', function()
         tostring(state.hasOrder),
         tostring(state.restaurantId or "None"),
         math.floor(state.cooldownRemaining / 1000),
-        tostring(playerdata.job and playerdata.job.name or "None")
+        tostring(PlayerData.job and PlayerData.job.name or "None")
     )
     
     lib.alertDialog({

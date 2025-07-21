@@ -20,19 +20,18 @@ Framework.Type = detectFramework()
 -- Client-side framework functions
 if not IsDuplicityVersion() then
     if Framework.Type == 'qbox' then
-        -- QBox uses modules
-        local playerdata = require '@qbx_core.modules.playerdata'
-        
+        -- QBox uses exports and LocalPlayer state
         Framework.GetPlayerData = function()
-            return playerdata
+            return exports.qbx_core:GetPlayerData()
         end
         
         Framework.GetPlayerJob = function()
-            return playerdata.job
+            local playerData = exports.qbx_core:GetPlayerData()
+            return playerData and playerData.job
         end
         
         Framework.IsPlayerLoaded = function()
-            return playerdata ~= nil and playerdata.citizenid ~= nil
+            return LocalPlayer.state.isLoggedIn
         end
         
     elseif Framework.Type == 'qbcore' then
@@ -84,6 +83,22 @@ else
             return false
         end
         
+        Framework.AddItem = function(source, item, amount, metadata)
+            local player = exports.qbx_core:GetPlayer(source)
+            if player then
+                return player.Functions.AddItem(item, amount, metadata)
+            end
+            return false
+        end
+        
+        Framework.RemoveItem = function(source, item, amount)
+            local player = exports.qbx_core:GetPlayer(source)
+            if player then
+                return player.Functions.RemoveItem(item, amount)
+            end
+            return false
+        end
+        
     elseif Framework.Type == 'qbcore' then
         -- QBCore server functions
         local QBCore = exports['qb-core']:GetCoreObject()
@@ -110,6 +125,22 @@ else
             local player = QBCore.Functions.GetPlayer(source)
             if player then
                 return player.Functions.RemoveMoney(moneyType, amount, reason)
+            end
+            return false
+        end
+        
+        Framework.AddItem = function(source, item, amount, metadata)
+            local player = QBCore.Functions.GetPlayer(source)
+            if player then
+                return player.Functions.AddItem(item, amount, metadata)
+            end
+            return false
+        end
+        
+        Framework.RemoveItem = function(source, item, amount)
+            local player = QBCore.Functions.GetPlayer(source)
+            if player then
+                return player.Functions.RemoveItem(item, amount)
             end
             return false
         end
