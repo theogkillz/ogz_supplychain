@@ -50,9 +50,15 @@ client_scripts {
     'client/systems/warehouse/cl_warehouse_core.lua',
     'client/systems/warehouse/cl_warehouse_delivery.lua',
     'client/systems/warehouse/cl_warehouse_zones.lua',
+    'client/systems/warehouse/cl_warehouse_unloading.lua',
+    'client/systems/warehouse/cl_container_system.lua',
+    'client/systems/warehouse/cl_emergency_orders.lua',
     
     -- Seller System
     'client/systems/seller/cl_seller_core.lua',
+
+    -- Economic System
+    'client/systems/economics/cl_market_display.lua',
     
     -- Container System (Future)
     -- 'client/systems/containers/cl_container_core.lua',
@@ -72,7 +78,7 @@ client_scripts {
     'client/ui/cl_menus.lua',
     
     -- Analytics
-    'client/systems/analytics/cl_leaderboard.lua',
+    'client/systems/analytics/cl_achievements.lua',
     
     -- Utilities
     'client/utils/cl_utils.lua'
@@ -97,6 +103,8 @@ server_scripts {
     'server/systems/warehouse/sv_warehouse_core.lua',
     'server/systems/warehouse/sv_warehouse_delivery.lua',
     'server/systems/warehouse/sv_warehouse_stock.lua',
+    'server/systems/warehouse/sv_container_system.lua',
+    'server/systems/warehouse/sv_emergency_orders.lua',
     
     -- Economic System
     'server/systems/economics/sv_market_dynamics.lua',
@@ -165,50 +173,88 @@ optional_dependencies {
 }
 
 -- Exports
-exports {
-    -- Framework
+client_exports {
+    -- Client Framework
     'GetFramework',
-    'GetStateManager',
-    'GetConfig',
+    'GetConstants',
     
-    -- Restaurant System
-    'GetRestaurantData',
-    'GetRestaurantStock',
+    -- Client Restaurant
+    'GetRestaurantFunctions',
+    'GetCurrentIngredients',
+    'GetOrderItemCount',
     
-    -- Warehouse System
-    'GetWarehouseStock',
-    'GetActiveOrders',
+    -- Client Warehouse
+    'GetWarehouseFunctions',
+    'IsInDelivery',
+    'GetDeliveryVan',
+    'GetCurrentTeam',
+    'GetCurrentOrder',
+    'GetBoxCount',
+    'GetCurrentRestaurantId',
+    'IsUnloading',
+    'GetUnloadedBoxes',
     
-    -- Team System
-    'GetTeamData',
-    'IsInTeam',
+    -- Client Container
+    'GetActiveContainer',
+    'HasActiveContainer',
     
-    -- Analytics
-    'GetPlayerStats',
-    'GetLeaderboard'
+    -- Client Emergency
+    'GetActiveEmergencies',
+    'IsInEmergencyDelivery',
+    'OpenEmergencyOrdersMenu',
+    
+    -- Client Market
+    'GetCurrentMarketData',
+    'IsMarketEventActive',
+    'ShowMarketReport',
+    
+    -- Client Achievements
+    'GetPlayerAchievements',
+    'ShowAchievements',
+    'GetRecentUnlocks'
 }
 
 -- Server Exports
 server_exports {
-    -- Framework
+    -- Core
     'GetFramework',
     'GetStateManager',
     
-    -- Restaurant System
-    'CreateRestaurantOrder',
-    'UpdateRestaurantStock',
-    
-    -- Warehouse System
-    'ProcessDelivery',
-    'UpdateWarehouseStock',
-    
-    -- Economic System
-    'GetDynamicPrice',
+    -- Warehouse
+    'GetWarehouseStock',
     'UpdateMarketPrices',
+    'CheckEmergencyOrders',
+    'GetActiveDeliveries',
+    'GetDeliveryTeams',
     
-    -- Analytics
-    'RecordDelivery',
-    'UpdatePlayerStats'
+    -- Restaurant
+    'CreateRestaurantOrder',
+    
+    -- Team
+    'GetTeamData',
+    'IsInTeam',
+    'GetPlayerTeam',
+    
+    -- Container
+    'GetActiveContainer',
+    'GetPlayerRental',
+    'GetContainerQuality',
+    
+    -- Market
+    'GetMarketPrices',
+    'GetItemPrice',
+    'GetPriceTrend',
+    'TriggerMarketEvent',
+    
+    -- Emergency
+    'GetEmergencyOrders',
+    'CreateEmergencyOrder',
+    'CheckEmergencyConditions',
+    
+    -- Achievements
+    'GetPlayerAchievements',
+    'UnlockAchievement',
+    'CheckAchievementProgress'
 }
 
 -- Data files for items (if needed)
