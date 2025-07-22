@@ -63,6 +63,7 @@ SupplyChain.Constants.Events = {
         UpdateDeliveryProgress = "SupplyChain:Server:UpdateDeliveryProgress",
         CompleteDelivery = "SupplyChain:Server:CompleteDelivery",
         CancelDelivery = "SupplyChain:Server:CancelDelivery",
+        GetWarehouseStock = "SupplyChain:Server:GetWarehouseStock",
         
         -- Team
         CreateTeam = "SupplyChain:Server:CreateTeam",
