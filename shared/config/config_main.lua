@@ -192,10 +192,27 @@ Config.Leaderboard = {
 
 -- Stock Management
 Config.Stock = {
-    lowStockThreshold = 25,          -- Alert when below this
-    criticalStockThreshold = 10,     -- Critical alert threshold
-    maxStockCapacity = 1000,         -- Max items per ingredient
-    restockAmount = 100              -- Default restock quantity
+    lowStockThreshold = 50,
+    criticalStockThreshold = 10,
+    restockAmount = 500,
+    stockLevels = {
+        -- Default max stock levels per item
+        bun = 1000,
+        patty = 800,
+        lettuce = 500,
+        cheese = 400,
+        tomato = 300,
+        onion = 300,
+        pickle = 400,
+        bacon = 300,
+        chicken = 500,
+        fish = 300,
+        potato = 800,
+        oil = 300,
+        salt = 500,
+        pepper = 500,
+        sauce = 400
+    }
 }
 
 -- Seller/Distributor Settings

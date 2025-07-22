@@ -4,8 +4,8 @@ local Framework = SupplyChain.Framework
 local StateManager = SupplyChain.StateManager
 local Constants = SupplyChain.Constants
 
--- Get delivery teams from warehouse
-local deliveryTeams = exports['ogz_supplychain']:GetDeliveryTeams()
+-- Initialize delivery teams table
+local deliveryTeams = {}
 
 -- Create team
 RegisterNetEvent(Constants.Events.Server.CreateTeam)

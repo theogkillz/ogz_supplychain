@@ -1,3 +1,4 @@
+-- server/systems/warehouse/sv_warehouse_core.lua
 -- Warehouse Server Core System
 
 local Framework = SupplyChain.Framework
@@ -445,6 +446,11 @@ end
 
 -- Check delivery achievements
 function CheckDeliveryAchievements(playerId, delivery, deliveryTime, boxCount, teamSize)
+    -- Ensure exports are available
+    if not exports['ogz_supplychain'] or not exports['ogz_supplychain'].CheckAchievementProgress then 
+        return 
+    end
+    
     -- Check delivery count achievements
     exports['ogz_supplychain']:CheckAchievementProgress(playerId, "delivery_count", nil)
     

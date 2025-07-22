@@ -192,7 +192,7 @@ function CalculatePriceFactors(itemName, data)
     }
     
     -- Supply factor
-    local maxStock = Config.Stock.stockLevels[itemName] or 1000
+    local maxStock = Config.Stock.stockLevels and Config.Stock.stockLevels[itemName] or 1000
     local stockPercentage = data.currentStock / maxStock
     
     if stockPercentage < 0.1 then
