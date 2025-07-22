@@ -99,7 +99,7 @@ AddEventHandler(Constants.Events.Server.CreateRestaurantOrder, function(orderDat
     
     -- Save to database
     exports.oxmysql:execute([[
-        INSERT INTO supply_restaurant_orders 
+        INSERT INTO supply_orders 
         (order_id, restaurant_id, ordered_by, order_data, status, created_at) 
         VALUES (?, ?, ?, ?, ?, NOW())
     ]], {
@@ -322,7 +322,7 @@ AddEventHandler(Constants.Events.Server.CompleteMultiBoxDelivery, function(data)
     
     -- Update database
     exports.oxmysql:execute([[
-        UPDATE supply_restaurant_orders 
+        UPDATE supply_orders 
         SET status = 'completed', 
             delivery_time = ?, 
             payment_amount = ?,
