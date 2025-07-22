@@ -1,4 +1,3 @@
--- shared/config/config_economics.lua
 -- Economic System Configuration
 
 Config = Config or {}
@@ -360,5 +359,17 @@ function Config.Economics.CalculateDeliveryReward(distance, boxes, deliveryTime,
     
     return math.floor(reward)
 end
+
+Config.Economics.inflationRate = 1.02
+Config.Economics.taxRate = 0.15
+Config.Economics.bonusMultipliers = {
+    speed = 1.5,
+    volume = 1.2,
+    quality = 1.3,
+    team = 1.25
+}
+
+-- Also ensure this is present (if not already):
+Config.Economics.lowThreshold = 5  -- For dynamic pricing
 
 print("^2[SupplyChain]^7 Economics configuration loaded")

@@ -19,27 +19,6 @@ Config.UI = {
     enableSounds = true
 }
 
--- Economic Settings
-Config.Economics = {
-    enabled = true,
-    dynamicPricing = {
-        enabled = true,
-        minMultiplier = 0.5,         -- Minimum price multiplier
-        maxMultiplier = 1.5,         -- Maximum price multiplier
-        peakThreshold = 20,          -- Player count for peak pricing
-        lowThreshold = 5,            -- Player count for discount
-        updateInterval = 300         -- Update frequency (seconds)
-    },
-    inflationRate = 1.02,            -- Annual inflation rate
-    taxRate = 0.15,                  -- Tax on transactions
-    bonusMultipliers = {
-        speed = 1.5,                 -- Speed delivery bonus
-        volume = 1.2,                -- High volume bonus
-        quality = 1.3,               -- Quality preservation bonus
-        team = 1.25                  -- Team delivery bonus
-    }
-}
-
 -- Reward Settings
 Config.Rewards = {
     driverPaymentPercentage = 0.22,  -- 22% of order value
