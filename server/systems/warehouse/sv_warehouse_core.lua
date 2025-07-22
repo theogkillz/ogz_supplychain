@@ -375,6 +375,327 @@ AddEventHandler(Constants.Events.Server.GetWarehouseStock, function()
     end
 end)
 
+-- ============================================
+-- MULTI-ORDER SYSTEM ADDITIONS
+-- Add these event handlers to support container orders
+-- ============================================
+
+-- Request container orders handler
+RegisterNetEvent("SupplyChain:Server:RequestContainerOrders")
+AddEventHandler("SupplyChain:Server:RequestContainerOrders", function()
+    local source = source
+    local player = Framework.GetPlayer(source)
+    if not player then return end
+    
+    -- Verify warehouse worker
+    local playerJob = Framework.GetJob(player)
+    if playerJob ~= Config.Warehouse.warehouseJob then
+        Framework.Notify(source, "You must be a warehouse worker", "error")
+        return
+    end
+    
+    -- Get all pending orders from ActiveOrders table
+    local pendingOrders = {}
+    
+    -- Check if ActiveOrders exists (from sv_restaurant_orders_v2.lua)
+    if ActiveOrders then
+        for orderId, order in pairs(ActiveOrders) do
+            if order.status == "pending" then
+                table.insert(pendingOrders, order)
+            end
+        end
+    else
+        -- Fallback to database query if ActiveOrders not available
+        local dbOrders = exports.oxmysql:executeSync([[
+            SELECT * FROM supply_restaurant_orders 
+            WHERE status = 'pending' 
+            ORDER BY created_at ASC
+        ]])
+        
+        for _, dbOrder in ipairs(dbOrders or {}) do
+            local orderData = json.decode(dbOrder.order_data)
+            if orderData then
+                orderData.id = dbOrder.order_id
+                table.insert(pendingOrders, orderData)
+            end
+        end
+    end
+    
+    -- Get worker stats for today
+    local playerId = Framework.GetIdentifier(player)
+    local stats = {
+        deliveries = 0,
+        containers = 0,
+        earnings = 0
+    }
+    
+    -- Query database for today's stats
+    local result = exports.oxmysql:executeSync([[
+        SELECT 
+            COUNT(DISTINCT order_id) as deliveries,
+            SUM(total_boxes) as containers,
+            SUM(payment) as earnings
+        FROM supply_deliveries
+        WHERE player_id = ? 
+        AND DATE(created_at) = CURDATE()
+        AND status = 'completed'
+    ]], {playerId})
+    
+    if result and result[1] then
+        stats.deliveries = result[1].deliveries or 0
+        stats.containers = result[1].containers or 0
+        stats.earnings = result[1].earnings or 0
+    end
+    
+    -- Send to client
+    TriggerClientEvent("SupplyChain:Server:SendContainerOrders", source, pendingOrders, stats)
+end)
+
+-- Accept multiple orders handler
+RegisterNetEvent("SupplyChain:Server:AcceptMultipleOrders")
+AddEventHandler("SupplyChain:Server:AcceptMultipleOrders", function(consolidatedOrder)
+    local source = source
+    local player = Framework.GetPlayer(source)
+    if not player then return end
+    
+    -- Verify warehouse worker
+    local playerJob = Framework.GetJob(player)
+    if playerJob ~= Config.Warehouse.warehouseJob then
+        Framework.Notify(source, "You must be a warehouse worker", "error")
+        return
+    end
+    
+    -- Check if player already has active delivery
+    if ActiveDeliveries and ActiveDeliveries[source] then
+        Framework.Notify(source, "You already have an active delivery", "error")
+        return
+    end
+    
+    -- Verify all orders are still available
+    local allAvailable = true
+    local validOrders = {}
+    
+    if ActiveOrders then
+        -- Check against ActiveOrders table
+        for _, order in ipairs(consolidatedOrder.orders) do
+            if not ActiveOrders[order.id] or ActiveOrders[order.id].status ~= "pending" then
+                allAvailable = false
+                break
+            else
+                table.insert(validOrders, ActiveOrders[order.id])
+            end
+        end
+    else
+        -- Fallback to database check
+        for _, order in ipairs(consolidatedOrder.orders) do
+            local dbCheck = exports.oxmysql:executeSync([[
+                SELECT status FROM supply_restaurant_orders 
+                WHERE order_id = ? AND status = 'pending'
+            ]], {order.id})
+            
+            if not dbCheck or #dbCheck == 0 then
+                allAvailable = false
+                break
+            else
+                table.insert(validOrders, order)
+            end
+        end
+    end
+    
+    if not allAvailable then
+        Framework.Notify(source, "Some orders are no longer available", "error")
+        TriggerEvent("SupplyChain:Server:RequestContainerOrders", source)
+        return
+    end
+    
+    -- Update order statuses
+    local playerId = Framework.GetIdentifier(player)
+    local currentTime = os.time()
+    
+    -- Update in ActiveOrders if available
+    if ActiveOrders then
+        for _, order in ipairs(consolidatedOrder.orders) do
+            if ActiveOrders[order.id] then
+                ActiveOrders[order.id].status = "preparing"
+                ActiveOrders[order.id].assignedTo = playerId
+                ActiveOrders[order.id].deliveryStartTime = currentTime
+            end
+        end
+    end
+    
+    -- Update in database
+    for _, order in ipairs(consolidatedOrder.orders) do
+        exports.oxmysql:execute([[
+            UPDATE supply_restaurant_orders 
+            SET status = 'preparing', assigned_to = ?, updated_at = NOW() 
+            WHERE order_id = ?
+        ]], {playerId, order.id})
+    end
+    
+    -- Create delivery record
+    if not ActiveDeliveries then
+        ActiveDeliveries = {}
+    end
+    
+    ActiveDeliveries[source] = {
+        orderId = consolidatedOrder.orderId,
+        orderIds = {}, -- Track individual order IDs
+        workerId = source,
+        playerId = playerId,
+        restaurantId = consolidatedOrder.restaurantId,
+        startTime = currentTime,
+        totalContainers = consolidatedOrder.totalContainers,
+        containersLoaded = 0,
+        containersDelivered = 0,
+        vanSpawned = false
+    }
+    
+    -- Store individual order IDs
+    for _, order in ipairs(consolidatedOrder.orders) do
+        table.insert(ActiveDeliveries[source].orderIds, order.id)
+    end
+    
+    -- Get restaurant name
+    local restaurant = Config.Restaurants[consolidatedOrder.restaurantId]
+    local restaurantName = restaurant and restaurant.name or "Unknown"
+    
+    -- Create delivery record in database
+    exports.oxmysql:execute([[
+        INSERT INTO supply_deliveries 
+        (delivery_id, player_id, restaurant_id, order_group_id, total_boxes, status, created_at) 
+        VALUES (?, ?, ?, ?, ?, 'preparing', NOW())
+    ]], {
+        consolidatedOrder.orderId,
+        playerId,
+        consolidatedOrder.restaurantId,
+        json.encode(ActiveDeliveries[source].orderIds),
+        consolidatedOrder.totalContainers
+    })
+    
+    -- Send success response
+    TriggerClientEvent("SupplyChain:Client:MultiOrderAccepted", source, {
+        success = true,
+        orderId = consolidatedOrder.orderId,
+        orderData = consolidatedOrder,
+        restaurantId = consolidatedOrder.restaurantId,
+        restaurantName = restaurantName,
+        totalContainers = consolidatedOrder.totalContainers
+    })
+    
+    print(string.format("^3[SupplyChain]^7 Worker %s accepted %d orders (%d containers) for %s", 
+        GetPlayerName(source), #consolidatedOrder.orders, consolidatedOrder.totalContainers, restaurantName))
+end)
+
+-- Update the existing VanSpawned handler to support multi-order
+local originalVanSpawnedHandler = RegisterNetEvent(Constants.Events.Server.VanSpawned)
+if originalVanSpawnedHandler then
+    RemoveEventHandler(originalVanSpawnedHandler)
+end
+
+RegisterNetEvent(Constants.Events.Server.VanSpawned)
+AddEventHandler(Constants.Events.Server.VanSpawned, function(data)
+    local source = source
+    local delivery = ActiveDeliveries[source]
+    if not delivery then return end
+    
+    delivery.vanSpawned = true
+    local order = nil
+    
+    -- Check if we have the new multi-order format
+    if delivery.orderId and string.sub(delivery.orderId, 1, 5) == "MULTI" then
+        -- This is a multi-order delivery
+        order = {
+            id = delivery.orderId,
+            restaurantId = delivery.restaurantId,
+            totalContainers = delivery.totalContainers,
+            containers = {},
+            items = {}
+        }
+        
+        -- Aggregate containers from all orders
+        if ActiveOrders then
+            for _, orderId in ipairs(delivery.orderIds or {}) do
+                local subOrder = ActiveOrders[orderId]
+                if subOrder and subOrder.containers then
+                    for _, container in ipairs(subOrder.containers) do
+                        table.insert(order.containers, container)
+                    end
+                    for _, item in ipairs(subOrder.items or {}) do
+                        table.insert(order.items, item)
+                    end
+                end
+            end
+        end
+    else
+        -- Legacy single order support
+        order = ActiveOrders and ActiveOrders[delivery.orderId]
+    end
+    
+    if not order then return end
+    
+    -- Get warehouse config
+    local warehouseId = GetPlayerWarehouseId(source)
+    local warehouseConfig = Config.Warehouses[warehouseId]
+    
+    -- Start multi-box delivery
+    TriggerClientEvent("SupplyChain:Client:StartMultiBoxDelivery", source, {
+        orderData = order,
+        restaurantId = order.restaurantId,
+        warehouseConfig = warehouseConfig,
+        van = data.vanNetId
+    })
+end)
+
+-- Add debug command for warehouse stats
+RegisterCommand("sc_warehousestats", function(source, args)
+    if source == 0 then
+        -- Console command
+        print("^3[SupplyChain]^7 Warehouse Statistics:")
+        
+        if ActiveOrders then
+            local pendingCount = 0
+            local totalContainers = 0
+            for orderId, order in pairs(ActiveOrders) do
+                if order.status == "pending" then
+                    pendingCount = pendingCount + 1
+                    totalContainers = totalContainers + (order.totalContainers or 0)
+                end
+            end
+            print(string.format("  Pending Orders: %d (%d containers)", pendingCount, totalContainers))
+        end
+        
+        if ActiveDeliveries then
+            print(string.format("  Active Deliveries: %d", #ActiveDeliveries))
+            for workerId, delivery in pairs(ActiveDeliveries) do
+                print(string.format("    - Worker %d: %s (%d/%d containers)", 
+                    workerId, delivery.orderId, delivery.containersDelivered or 0, delivery.totalContainers or 0))
+            end
+        end
+    else
+        -- Player command
+        local player = Framework.GetPlayer(source)
+        if not player then return end
+        
+        local playerJob = Framework.GetJob(player)
+        if playerJob ~= Config.Warehouse.warehouseJob and not Framework.HasPermission(player, "admin") then
+            Framework.Notify(source, "You must be a warehouse worker to use this command", "error")
+            return
+        end
+        
+        -- Show player stats
+        TriggerEvent("SupplyChain:Server:RequestContainerOrders", source)
+    end
+end, false)
+
+-- Helper function (add if not exists)
+function GetPlayerWarehouseId(source)
+    -- For now, return first warehouse
+    -- TODO: Add warehouse assignment system
+    for warehouseId, _ in pairs(Config.Warehouses) do
+        return warehouseId
+    end
+    return "warehouse_1"
+end
 -- Utility Functions
 function GetPlayerCitizenId(playerId)
     local player = Framework.GetPlayer(playerId)

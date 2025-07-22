@@ -39,6 +39,7 @@ client_scripts {
     
     -- Warehouse System
     'client/systems/warehouse/cl_warehouse_core.lua',
+    'client/systems/warehouse/cl_warehouse_menu.lua',
     'client/systems/warehouse/cl_warehouse_delivery.lua',
     'client/systems/warehouse/cl_warehouse_delivery_v2.lua',
     'client/systems/warehouse/cl_warehouse_zones.lua',
@@ -132,7 +133,14 @@ client_exports {
     -- Client Achievements
     'GetPlayerAchievements',
     'ShowAchievements',
-    'GetRecentUnlocks'
+    'GetRecentUnlocks',
+
+    -- Multi-Order System
+    'GetShoppingCart',
+    'ClearShoppingCart',
+    'GetDeliveryState',
+    'IsDeliveryActive',
+    'OpenWarehouseMenu',
 }
 
 -- Server Exports

@@ -1,4 +1,4 @@
--- Warehouse Client Core System
+-- Updated Warehouse Core System with Menu Integration
 
 local Framework = SupplyChain.Framework
 local Constants = SupplyChain.Constants
@@ -27,7 +27,8 @@ end)
 local Warehouse = {}
 
 function Warehouse.OpenMainMenu()
-    TriggerServerEvent(Constants.Events.Server.GetPendingOrders)
+    -- Trigger the new menu system
+    TriggerEvent("SupplyChain:Client:OpenWarehouseMenu")
 end
 
 function Warehouse.AcceptOrder(orderGroupId, restaurantId)
@@ -114,12 +115,47 @@ AddEventHandler(Constants.Events.Client.ShowPendingOrders, function(orders)
         return
     end
     
+    -- Use the old menu system for compatibility
     TriggerEvent("SupplyChain:Client:CreateOrdersMenu", orders)
 end)
 
 RegisterNetEvent(Constants.Events.Client.StartDelivery)
 AddEventHandler(Constants.Events.Client.StartDelivery, function(restaurantId, orders)
     Warehouse.StartDelivery(restaurantId, orders)
+end)
+
+-- Handle multi-order acceptance response
+RegisterNetEvent("SupplyChain:Client:MultiOrderAccepted")
+AddEventHandler("SupplyChain:Client:MultiOrderAccepted", function(data)
+    if data.success then
+        Framework.Notify(nil, string.format("Accepted %d containers for delivery!", data.totalContainers), "success")
+        
+        -- Update state for multi-order
+        isInDelivery = true
+        currentOrder = data.orderData
+        currentOrderRestaurantId = data.restaurantId
+        lastDeliveryTime = GetGameTimer()
+        
+        -- Spawn vehicle prompt
+        lib.alertDialog({
+            header = 'Orders Accepted!',
+            content = string.format([[
+You have accepted delivery of **%d containers** to **%s**.
+
+Next steps:
+1. Spawn a delivery van from the vehicle menu
+2. Load all containers from the warehouse
+3. Deliver to the restaurant
+4. Return the van for payment
+
+**Remember:** Each container can hold up to 12 items and containers are type-specific!
+            ]], data.totalContainers, data.restaurantName),
+            centered = true,
+            cancel = false
+        })
+    else
+        Framework.Notify(nil, data.message or "Failed to accept orders", "error")
+    end
 end)
 
 RegisterNetEvent(Constants.Events.Client.TeamUpdate)
@@ -139,19 +175,28 @@ AddEventHandler(Constants.Events.Client.TeamDisband, function()
     Framework.Notify(nil, "Team has been disbanded", "info")
 end)
 
--- Spawn delivery vehicle
+-- Spawn delivery vehicle (updated for multi-container)
 RegisterNetEvent("SupplyChain:Client:SpawnDeliveryVehicle")
 AddEventHandler("SupplyChain:Client:SpawnDeliveryVehicle", function(restaurantId, orders)
-    local warehouseConfig = Config.Warehouses[1] -- Get nearest warehouse
+    local warehouseConfig = Config.Warehouses[GetNearestWarehouse()] or Config.Warehouses[1]
     if not warehouseConfig or not warehouseConfig.vehicle then
         Framework.Notify(nil, "No warehouse configuration found", "error")
         return
     end
     
+    -- Calculate total containers needed
+    local totalContainers = 0
+    if orders.totalContainers then
+        totalContainers = orders.totalContainers
+    else
+        -- Legacy support
+        totalContainers = REQUIRED_BOXES
+    end
+    
     -- Alert dialog
     lib.alertDialog({
         header = "New Delivery Job",
-        content = "Load 3 boxes from the warehouse into the van, then deliver them to the restaurant!",
+        content = string.format("Load %d containers from the warehouse into the van, then deliver them to the restaurant!", totalContainers),
         centered = true,
         cancel = false
     })
@@ -177,6 +222,7 @@ AddEventHandler("SupplyChain:Client:SpawnDeliveryVehicle", function(restaurantId
     SetVehRadioStation(deliveryVan, "OFF")
     SetVehicleEngineOn(deliveryVan, true, true, false)
     SetEntityCleanupByEngine(deliveryVan, false)
+    NetworkRegisterEntityAsNetworked(deliveryVan)
     
     -- Give keys
     local plate = GetVehicleNumberPlateText(deliveryVan)
@@ -189,10 +235,52 @@ AddEventHandler("SupplyChain:Client:SpawnDeliveryVehicle", function(restaurantId
     -- Fade in
     DoScreenFadeIn(2500)
     
-    Framework.Notify(nil, "Van spawned! Load 3 boxes from the warehouse", "success")
+    Framework.Notify(nil, string.format("Van spawned! Load %d containers from the warehouse", totalContainers), "success")
     
-    -- Start box loading
-    TriggerEvent("SupplyChain:Client:StartBoxLoading", warehouseConfig, deliveryVan, restaurantId, orders)
+    -- Wait for network
+    local netId = NetworkGetNetworkIdFromEntity(deliveryVan)
+    
+    -- Notify server that van is spawned
+    TriggerServerEvent(Constants.Events.Server.VanSpawned, {
+        vanNetId = netId,
+        restaurantId = restaurantId
+    })
+end)
+
+-- Helper function to get nearest warehouse
+function GetNearestWarehouse()
+    local playerPos = GetEntityCoords(PlayerPedId())
+    local nearestId = nil
+    local nearestDist = 999999
+    
+    for warehouseId, warehouse in pairs(Config.Warehouses) do
+        if warehouse.blip and warehouse.blip.coords then
+            local dist = #(playerPos - warehouse.blip.coords)
+            if dist < nearestDist then
+                nearestDist = dist
+                nearestId = warehouseId
+            end
+        end
+    end
+    
+    return nearestId or "warehouse_1"
+end
+
+-- Request server to spawn vehicle menu
+RegisterNetEvent("SupplyChain:Client:RequestVehicleSpawn")
+AddEventHandler("SupplyChain:Client:RequestVehicleSpawn", function()
+    if not isInDelivery then
+        Framework.Notify(nil, "You need to accept a delivery order first", "error")
+        return
+    end
+    
+    if DoesEntityExist(deliveryVan) then
+        Framework.Notify(nil, "You already have a delivery vehicle", "error")
+        return
+    end
+    
+    -- Spawn vehicle for current order
+    TriggerEvent("SupplyChain:Client:SpawnDeliveryVehicle", currentOrderRestaurantId, currentOrder)
 end)
 
 -- Export warehouse functions
@@ -210,4 +298,8 @@ end)
 
 exports('GetCurrentTeam', function()
     return currentTeam
+end)
+
+exports('GetCurrentRestaurantId', function()
+    return currentOrderRestaurantId
 end)
