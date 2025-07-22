@@ -18,6 +18,16 @@ Config.Restaurants = {
         delivery = vector3(-1173.53, -892.72, 13.86),
         deliveryBox = vector3(-1177.39, -890.98, 12.79),
         
+        -- Order Locations
+        orderLocations = {
+            {
+                coords = vector3(-1178.0913085938, -896.11010742188, 14.108023834229),
+                targetLabel = "Order Ingredients",
+                targetIcon = "fas fa-shopping-cart", -- Updated icon
+                -- Rest of config...
+            }
+        },
+
         -- Clock In Location
         clockin = {
             coords = vector4(-1191.07, -900.27, 13.98, 302.0),
@@ -78,7 +88,7 @@ Config.Restaurants = {
                 dimensions = { width = 1.0, length = 1.0, height = 0.5 },
                 items = {
                     {
-                        item = "fries",
+                        item = "bsfries",
                         amount = 1,
                         time = 5000,
                         progressLabel = "Making Fries...",

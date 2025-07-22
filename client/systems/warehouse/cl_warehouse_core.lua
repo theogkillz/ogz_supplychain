@@ -101,6 +101,12 @@ function Warehouse.CancelDelivery()
 end
 
 -- Event Handlers
+RegisterNetEvent("SupplyChain:Client:ViewContainerOrders")
+AddEventHandler("SupplyChain:Client:ViewContainerOrders", function()
+    -- Request orders from server
+    TriggerServerEvent("SupplyChain:Server:RequestContainerOrders")
+end)
+
 RegisterNetEvent(Constants.Events.Client.ShowPendingOrders)
 AddEventHandler(Constants.Events.Client.ShowPendingOrders, function(orders)
     if not orders or #orders == 0 then

@@ -83,13 +83,22 @@ AddEventHandler("SupplyChain:Client:OpenOrderMenu", function(data)
         Framework.Notify(nil, "Invalid restaurant configuration", "error")
         return
     end
+end)
     
     -- Trigger menu creation
-    TriggerEvent("SupplyChain:Client:CreateOrderMenu", {
-        restaurantId = restaurantId,
-        restaurant = restaurant,
+    RegisterNetEvent("SupplyChain:Client:InteractWithOrderPoint")
+    AddEventHandler("SupplyChain:Client:InteractWithOrderPoint", function(data)
+    -- Get warehouse stock and prices
+    local warehouseStock = StateManager.GetWarehouseStock() or {}
+    local dynamicPrices = exports['ogz_supplychain']:GetDynamicPrices()
+    
+    -- Open new shopping cart menu
+    TriggerEvent("SupplyChain:Client:OpenRestaurantMenu", {
+        restaurantId = data.restaurantId,
+        restaurant = data.restaurant,
         warehouseStock = warehouseStock,
-        dynamicPrices = dynamicPrices
+        dynamicPrices = dynamicPrices,
+        clearCart = true -- Clear cart on new session
     })
 end)
 

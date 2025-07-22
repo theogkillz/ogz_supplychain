@@ -34,11 +34,13 @@ client_scripts {
     -- Restaurant System
     'client/systems/restaurants/cl_restaurant_core.lua',
     'client/systems/restaurants/cl_restaurant_menu.lua',
+    'client/systems/restaurants/cl_restaurant_menu_v2.lua',
     'client/systems/restaurants/cl_restaurant_zones.lua',
     
     -- Warehouse System
     'client/systems/warehouse/cl_warehouse_core.lua',
     'client/systems/warehouse/cl_warehouse_delivery.lua',
+    'client/systems/warehouse/cl_warehouse_delivery_v2.lua',
     'client/systems/warehouse/cl_warehouse_zones.lua',
     'client/systems/warehouse/cl_warehouse_unloading.lua',
     'client/systems/warehouse/cl_container_system.lua',
@@ -63,6 +65,7 @@ server_scripts {
     
     -- Restaurant System
     'server/systems/restaurants/sv_restaurant_core.lua',
+    'server/systems/restaurants/sv_restaurant_orders_v2.lua',
     
     -- Warehouse System
     'server/systems/warehouse/sv_warehouse_core.lua',

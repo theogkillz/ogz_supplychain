@@ -45,7 +45,15 @@ SupplyChain.Constants.Events = {
         -- Analytics
         ShowLeaderboard = "SupplyChain:Client:ShowLeaderboard",
         ShowStatistics = "SupplyChain:Client:ShowStatistics",
-        ShowAchievements = "SupplyChain:Client:ShowAchievements"
+        ShowAchievements = "SupplyChain:Client:ShowAchievements",
+
+        -- Multi-Order System
+        OpenRestaurantMenu = "SupplyChain:Client:OpenRestaurantMenu",
+        StartMultiBoxDelivery = "SupplyChain:Client:StartMultiBoxDelivery",
+        NewOrderNotification = "SupplyChain:Client:NewOrderNotification",
+        OrderUpdate = "SupplyChain:Client:OrderUpdate",
+        DeliveryComplete = "SupplyChain:Client:DeliveryComplete",
+        SpawnDeliveryVan = "SupplyChain:Client:SpawnDeliveryVan"
     },
     
     -- Server Events
@@ -85,7 +93,13 @@ SupplyChain.Constants.Events = {
         RecordDelivery = "SupplyChain:Server:RecordDelivery",
         UpdatePlayerStats = "SupplyChain:Server:UpdatePlayerStats",
         GetLeaderboard = "SupplyChain:Server:GetLeaderboard",
-        UnlockAchievement = "SupplyChain:Server:UnlockAchievement"
+        UnlockAchievement = "SupplyChain:Server:UnlockAchievement",
+        
+        -- Multi-Order System
+        AcceptWarehouseOrder = "SupplyChain:Server:AcceptWarehouseOrder",
+        VanSpawned = "SupplyChain:Server:VanSpawned",
+        DeliverContainer = "SupplyChain:Server:DeliverContainer",
+        CompleteMultiBoxDelivery = "SupplyChain:Server:CompleteMultiBoxDelivery"
     }
 }
 
