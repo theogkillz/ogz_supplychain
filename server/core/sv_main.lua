@@ -4,6 +4,60 @@ local Framework = SupplyChain.Framework
 local StateManager = SupplyChain.StateManager
 local Constants = SupplyChain.Constants
 
+-- Add this at the TOP of server/core/sv_main.lua, right after the local declarations:
+
+-- Debug: Check what config values are available
+CreateThread(function()
+    Wait(100) -- Wait for configs to load
+    
+    print("^3[DEBUG] Checking Config structure:^7")
+    
+    -- Check if Config exists
+    if Config then
+        print("^2[DEBUG] Config exists^7")
+        
+        -- Check if Economics exists
+        if Config.Economics then
+            print("^2[DEBUG] Config.Economics exists^7")
+            
+            -- Check what's inside Economics
+            print("^3[DEBUG] Config.Economics keys:^7")
+            for k, v in pairs(Config.Economics) do
+                print("  - " .. tostring(k) .. " = " .. type(v))
+            end
+            
+            -- Check specifically for dynamicPricing
+            if Config.Economics.dynamicPricing then
+                print("^2[DEBUG] Config.Economics.dynamicPricing exists^7")
+                print("  - enabled = " .. tostring(Config.Economics.dynamicPricing.enabled))
+            else
+                print("^1[DEBUG] Config.Economics.dynamicPricing is NIL^7")
+            end
+            
+            -- Check for market
+            if Config.Economics.market then
+                print("^2[DEBUG] Config.Economics.market exists^7")
+            end
+        else
+            print("^1[DEBUG] Config.Economics is NIL^7")
+        end
+        
+        -- Check Stock
+        if Config.Stock then
+            print("^2[DEBUG] Config.Stock exists^7")
+            if Config.Stock.stockLevels then
+                print("^2[DEBUG] Config.Stock.stockLevels exists^7")
+            else
+                print("^1[DEBUG] Config.Stock.stockLevels is NIL^7")
+            end
+        else
+            print("^1[DEBUG] Config.Stock is NIL^7")
+        end
+    else
+        print("^1[DEBUG] Config is NIL^7")
+    end
+end)
+
 -- Server initialization
 AddEventHandler('onResourceStart', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
@@ -126,7 +180,7 @@ function StartUpdateLoops()
     end)
     
     -- Market price update loop
-    if Config.Economics.dynamicPricing.enabled then
+    if Config.Economics and Config.Economics.dynamicPricing and Config.Economics.dynamicPricing.enabled then
         CreateThread(function()
             while true do
                 Wait(Config.Economics.dynamicPricing.updateInterval * 1000)

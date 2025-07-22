@@ -13,8 +13,8 @@ shared_scripts {
     '@lation_ui/init.lua',
     
     -- Core Systems (Must load first)
-    'shared/core/sh_framework_bridge.lua',
-    'shared/core/sh_globals.lua',
+    'shared/core/sh_framework.lua',
+    'shared/core/sh_state.lua',
     'shared/core/sh_constants.lua',
     
     -- Configuration Files

@@ -3,6 +3,7 @@
 Config = Config or {}
 
 Config.Economics = {
+    -- enabled = true,
     -- Market Dynamics
     market = {
         enabled = true,
@@ -359,6 +360,24 @@ function Config.Economics.CalculateDeliveryReward(distance, boxes, deliveryTime,
     
     return math.floor(reward)
 end
+
+-- Create dynamicPricing structure for compatibility
+Config.Economics.dynamicPricing = {
+    enabled = Config.Economics.market.enabled,
+    updateInterval = Config.Economics.market.updateInterval,
+    minMultiplier = 0.5,
+    maxMultiplier = 2.0,
+    peakThreshold = 20,
+    timeMultipliers = {
+        peak = 1.2,
+        normal = 1.0,
+        offPeak = 0.8,
+        weekend = 1.1
+    }
+}
+
+-- Add marketEventChance if missing
+Config.Economics.marketEventChance = Config.Economics.marketEventChance or 0.05
 
 Config.Economics.inflationRate = 1.02
 Config.Economics.taxRate = 0.15
