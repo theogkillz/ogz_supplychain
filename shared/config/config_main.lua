@@ -144,10 +144,14 @@ Config.Docks = {
 Config.EmergencyOrders = {
     enabled = true,
     checkInterval = 180,             -- Check every 3 minutes
+    cooldown = 600,                  -- Time between emergency checks
+    heroBonus = 1000,               -- Bonus for preventing stockout
+    failurePenalty = 100,           -- Penalty for failed emergency
     triggers = {
         criticalStock = 5,
         urgentStock = 15,
-        lowStock = 25
+        lowStock = 25,
+        demandSurge = 100
     },
     priorities = {
         critical = {level = 3, timeout = 1800, multiplier = 2.0},
