@@ -407,7 +407,7 @@ AddEventHandler("SupplyChain:Server:RequestContainerOrders", function()
     else
         -- Fallback to database query if ActiveOrders not available
         local dbOrders = exports.oxmysql:executeSync([[
-            SELECT * FROM supply_restaurant_orders 
+            SELECT * FROM supply_orders 
             WHERE status = 'pending' 
             ORDER BY created_at ASC
         ]])
@@ -489,7 +489,7 @@ AddEventHandler("SupplyChain:Server:AcceptMultipleOrders", function(consolidated
         -- Fallback to database check
         for _, order in ipairs(consolidatedOrder.orders) do
             local dbCheck = exports.oxmysql:executeSync([[
-                SELECT status FROM supply_restaurant_orders 
+                SELECT status FROM supply_orders 
                 WHERE order_id = ? AND status = 'pending'
             ]], {order.id})
             
@@ -526,7 +526,7 @@ AddEventHandler("SupplyChain:Server:AcceptMultipleOrders", function(consolidated
     -- Update in database
     for _, order in ipairs(consolidatedOrder.orders) do
         exports.oxmysql:execute([[
-            UPDATE supply_restaurant_orders 
+            UPDATE supply_orders 
             SET status = 'preparing', assigned_to = ?, updated_at = NOW() 
             WHERE order_id = ?
         ]], {playerId, order.id})
