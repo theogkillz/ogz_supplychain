@@ -75,7 +75,15 @@ CreateThread(function()
                     icon = "fas fa-warehouse",
                     label = "Warehouse Orders",
                     distance = 2.5,
-                    groups = Config.Warehouse.jobAccess,
+                    canInteract = function()
+                        local playerJob = Framework.GetJob()
+                        for _, allowedJob in ipairs(Config.Warehouse.jobAccess) do
+                            if playerJob == allowedJob then
+                                return true
+                            end
+                        end
+                        return false
+                    end,
                     onSelect = function()
                         -- Open the warehouse menu
                         exports['ogz_supplychain']:OpenWarehouseMenu()
@@ -358,3 +366,90 @@ exports('RefreshWarehousePeds', function()
         -- Re-run initialization
     end)
 end)
+
+-- Debug command to check for duplicate zones and peds
+RegisterCommand('checkwarehouse', function()
+    print("^3=== Warehouse Debug Info ===^7")
+    
+    -- Check warehouse peds
+    print("^2Warehouse Peds:^7")
+    for warehouseId, pedData in pairs(warehousePeds) do
+        if DoesEntityExist(pedData.ped) then
+            local coords = GetEntityCoords(pedData.ped)
+            print(string.format("  - Warehouse %s: Ped exists at %.2f, %.2f, %.2f", 
+                warehouseId, coords.x, coords.y, coords.z))
+        else
+            print(string.format("  - Warehouse %s: Ped missing!", warehouseId))
+        end
+    end
+    
+    -- Check container rental peds
+    print("^2Container Rental Peds:^7")
+    for i, pedData in pairs(containerRentalPeds) do
+        if DoesEntityExist(pedData.ped) then
+            local coords = GetEntityCoords(pedData.ped)
+            print(string.format("  - Rental %d (%s): Ped at %.2f, %.2f, %.2f", 
+                i, pedData.location.name, coords.x, coords.y, coords.z))
+        else
+            print(string.format("  - Rental %d: Ped missing!", i))
+        end
+    end
+    
+    -- Check for duplicate peds in area
+    local playerPos = GetEntityCoords(PlayerPedId())
+    local nearbyPeds = GetGamePool('CPed')
+    local pedCount = {}
+    
+    for _, ped in ipairs(nearbyPeds) do
+        if not IsPedAPlayer(ped) and #(GetEntityCoords(ped) - playerPos) < 100.0 then
+            local model = GetEntityModel(ped)
+            pedCount[model] = (pedCount[model] or 0) + 1
+        end
+    end
+    
+    print("^2Nearby Ped Models (within 100m):^7")
+    for model, count in pairs(pedCount) do
+        if count > 1 then
+            print(string.format("  ^1- Model %s: %d instances (DUPLICATE!)^7", model, count))
+        else
+            print(string.format("  - Model %s: %d instance", model, count))
+        end
+    end
+    
+    print("^3=== End Debug Info ===^7")
+end, false)
+
+-- Command to clean up duplicate peds
+RegisterCommand('cleanwarehouse', function()
+    local playerPos = GetEntityCoords(PlayerPedId())
+    local nearbyPeds = GetGamePool('CPed')
+    local removed = 0
+    
+    -- Track valid peds
+    local validPeds = {}
+    for _, pedData in pairs(warehousePeds) do
+        validPeds[pedData.ped] = true
+    end
+    for _, pedData in pairs(containerRentalPeds) do
+        validPeds[pedData.ped] = true
+    end
+    
+    -- Remove duplicates
+    for _, ped in ipairs(nearbyPeds) do
+        if not IsPedAPlayer(ped) and not validPeds[ped] then
+            local dist = #(GetEntityCoords(ped) - playerPos)
+            if dist < 50.0 then
+                local model = GetEntityModel(ped)
+                -- Check if it's a warehouse model
+                if model == GetHashKey('s_m_y_construct_02') or 
+                   model == GetHashKey('s_m_y_dockwork_01') or 
+                   model == GetHashKey('s_m_m_warehouse_01') then
+                    DeletePed(ped)
+                    removed = removed + 1
+                end
+            end
+        end
+    end
+    
+    Framework.Notify(nil, string.format("Cleaned up %d duplicate peds", removed), "success")
+end, false)

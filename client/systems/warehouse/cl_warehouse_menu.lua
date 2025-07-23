@@ -11,7 +11,14 @@ local activeDelivery = nil
 RegisterNetEvent("SupplyChain:Client:OpenWarehouseMenu")
 AddEventHandler("SupplyChain:Client:OpenWarehouseMenu", function(data)
     local playerJob = Framework.GetJob()
-    if playerJob ~= Config.Warehouse.warehouseJob then
+    local hasAccess = false
+    for _, allowedJob in ipairs(Config.Warehouse.jobAccess) do
+        if playerJob == allowedJob then
+            hasAccess = true
+            break
+        end
+    end
+    if not hasAccess then
         Framework.Notify(nil, "You must be a warehouse worker to access this", "error")
         return
     end

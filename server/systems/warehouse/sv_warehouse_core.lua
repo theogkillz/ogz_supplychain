@@ -389,7 +389,14 @@ AddEventHandler("SupplyChain:Server:RequestContainerOrders", function()
     
     -- Verify warehouse worker
     local playerJob = Framework.GetJob(player)
-    if playerJob ~= Config.Warehouse.jobAccess then
+    local hasAccess = false
+    for _, allowedJob in ipairs(Config.Warehouse.jobAccess) do
+        if playerJob == allowedJob then
+            hasAccess = true
+            break
+        end
+    end
+    if not hasAccess then
         Framework.Notify(source, "You must be a warehouse worker", "error")
         return
     end
@@ -460,7 +467,14 @@ AddEventHandler("SupplyChain:Server:AcceptMultipleOrders", function(consolidated
     
     -- Verify warehouse worker
     local playerJob = Framework.GetJob(player)
-    if playerJob ~= Config.Warehouse.jobAccess then
+    local hasAccess = false
+    for _, allowedJob in ipairs(Config.Warehouse.jobAccess) do
+        if playerJob == allowedJob then
+            hasAccess = true
+            break
+        end
+    end
+    if not hasAccess then
         Framework.Notify(source, "You must be a warehouse worker", "error")
         return
     end

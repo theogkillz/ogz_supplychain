@@ -223,19 +223,7 @@ Config.Warehouses = {
         position = vector3(-80.3, 6525.98, 30.49),
         heading = 43.09,
         pedModel = 's_m_y_construct_02',
-        stockUpdateInterval = 30,        -- Stock cache update (seconds)
-        maxOrdersPerGroup = 10,          -- Max items per order group
-        deliveryCooldown = 300,          -- 5 minutes between deliveries
-        requiredBoxesPerDelivery = 3,    -- Boxes needed per delivery
-        carryBoxProp = 'ng_proc_box_01a',        
-        jobAccess = {                    -- Jobs that can access warehouse
-            'hurst',
-            'butcher',
-            'slaughter',
-            'burgershot',
-            -- 'butcher',
-            -- 'slaughter',
-        },
+        carryBoxProp = 'ng_proc_box_01a',
         
         -- Vehicle spawn
         vehicle = {
@@ -265,19 +253,7 @@ Config.Warehouses = {
         position = vector3(-82.5, 6528.0, 30.49),
         heading = 226.19,
         pedModel = 's_m_y_construct_02',
-        stockUpdateInterval = 30,        -- Stock cache update (seconds)
-        maxOrdersPerGroup = 10,          -- Max items per order group
-        deliveryCooldown = 300,          -- 5 minutes between deliveries
-        requiredBoxesPerDelivery = 3,    -- Boxes needed per delivery
         carryBoxProp = 'ng_proc_box_01a',
-        jobAccess = {                    -- Jobs that can access warehouse
-            'hurst',
-            'butcher',
-            'slaughter',
-            'burgershot',
-            -- 'butcher',
-            -- 'slaughter',
-        },
         
         vehicle = {
             model = 'speedo',

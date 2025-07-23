@@ -104,20 +104,19 @@ Config.Teams = {
 
 -- Warehouse Settings
 Config.Warehouse = {
+    -- warehouseJob = "hurst",
     stockUpdateInterval = 30,        -- Stock cache update (seconds)
     maxOrdersPerGroup = 10,          -- Max items per order group
     deliveryCooldown = 300,          -- 5 minutes between deliveries
     requiredBoxesPerDelivery = 3,    -- Boxes needed per delivery
-    carryBoxProp = 'ng_proc_box_01a',
-    vehicleModel = 'speedo',
-    -- jobAccess = {                    -- Jobs that can access warehouse
-    --     'hurst',
-    --     'butcher',
-    --     'slaughter',
-    --     'burgershot',
-    --     -- 'butcher',
-    --     -- 'slaughter',
-    -- }
+}
+
+Config.Warehouse.warehouseJob = "hurst"  -- Primary warehouse job
+Config.Warehouse.jobAccess = {           -- All jobs with warehouse access
+    'hurst',
+    'burgershot',
+    'butcher',
+    'slaughter',
 }
 
 -- Manufacturing Settings

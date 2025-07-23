@@ -1,88 +1,11 @@
--- Warehouse Zones and Menu System
+-- Warehouse Zones System (Simplified - No Ped Creation)
 
 local Framework = SupplyChain.Framework
 local Constants = SupplyChain.Constants
 local Warehouse = exports['ogz_supplychain']:GetWarehouseFunctions()
 
--- Create warehouse zones
-CreateThread(function()
-    -- Wait for config to load
-    while not Config or not Config.Warehouses do
-        Wait(100)
-    end
-    
-    -- Create zones for each warehouse
-    for warehouseId, warehouse in ipairs(Config.Warehouses) do
-        if warehouse.active then
-            -- Create main interaction zone
-            exports.ox_target:addBoxZone({
-                coords = warehouse.position,
-                size = vector3(1.0, 0.5, 3.5),
-                rotation = warehouse.heading,
-                debug = Config.Debug.showZones,
-                options = {
-                    {
-                        name = "warehouse_processing_" .. warehouseId,
-                        icon = "fas fa-box",
-                        label = "Process Orders",
-                        groups = Config.Warehouse.jobAccess,
-                        onSelect = function()
-                            OpenWarehouseMenu()
-                        end
-                    },
-                    {
-                        name = "warehouse_containers_" .. warehouseId,
-                        icon = "fas fa-cube",
-                        label = "Container Rental",
-                        onSelect = function()
-                            TriggerEvent(Constants.Events.Client.ShowContainerMenu)
-                        end
-                    },
-                    {
-                        name = "warehouse_emergency_" .. warehouseId,
-                        icon = "fas fa-exclamation-triangle",
-                        label = "Emergency Orders",
-                        groups = Config.Warehouse.jobAccess,
-                        onSelect = function()
-                            exports['ogz_supplychain']:OpenEmergencyOrdersMenu()
-                        end
-                    }
-                }
-            })
-            
-            -- Create warehouse ped
-            if warehouse.pedModel then
-                local pedModel = GetHashKey(warehouse.pedModel)
-                RequestModel(pedModel)
-                while not HasModelLoaded(pedModel) do
-                    Wait(500)
-                end
-                
-                local ped = CreatePed(4, pedModel, warehouse.position.x, warehouse.position.y, warehouse.position.z - 1.0, warehouse.heading, false, true)
-                SetEntityAsMissionEntity(ped, true, true)
-                SetBlockingOfNonTemporaryEvents(ped, true)
-                FreezeEntityPosition(ped, true)
-                SetEntityInvincible(ped, true)
-                SetModelAsNoLongerNeeded(pedModel)
-            end
-            
-            -- Create blip
-            if warehouse.blip then
-                local blip = AddBlipForCoord(warehouse.position.x, warehouse.position.y, warehouse.position.z)
-                SetBlipSprite(blip, warehouse.blip.sprite or Constants.Blips.Warehouse)
-                SetBlipDisplay(blip, 4)
-                SetBlipScale(blip, warehouse.blip.scale or 0.6)
-                SetBlipColour(blip, warehouse.blip.color or Constants.BlipColors.Brown)
-                SetBlipAsShortRange(blip, true)
-                BeginTextCommandSetBlipName("STRING")
-                AddTextComponentString(warehouse.name or "Warehouse")
-                EndTextCommandSetBlipName(blip)
-            end
-        end
-    end
-    
-    print("^2[SupplyChain]^7 Warehouse zones initialized")
-end)
+-- This file only handles zone menu functionality
+-- Ped creation is handled by cl_warehouse_peds.lua
 
 -- Open warehouse menu
 function OpenWarehouseMenu()
@@ -100,7 +23,8 @@ function OpenWarehouseMenu()
             description = "View pending orders for delivery",
             icon = "fas fa-box",
             onSelect = function()
-                Warehouse.OpenMainMenu()
+                -- Use the new warehouse menu system
+                exports['ogz_supplychain']:OpenWarehouseMenu()
             end
         },
         {
@@ -529,3 +453,5 @@ function GetTimeAgo(timestamp)
         return math.floor(diff / 86400) .. " days"
     end
 end
+
+print("^2[SupplyChain]^7 Warehouse zone functions loaded")
