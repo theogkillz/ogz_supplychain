@@ -110,11 +110,14 @@ Config.Warehouse = {
     requiredBoxesPerDelivery = 3,    -- Boxes needed per delivery
     carryBoxProp = 'ng_proc_box_01a',
     vehicleModel = 'speedo',
-    jobAccess = {                    -- Jobs that can access warehouse
-        'warehouse',
-        'trucker',
-        'delivery'
-    }
+    -- jobAccess = {                    -- Jobs that can access warehouse
+    --     'hurst',
+    --     'butcher',
+    --     'slaughter',
+    --     'burgershot',
+    --     -- 'butcher',
+    --     -- 'slaughter',
+    -- }
 }
 
 -- Manufacturing Settings

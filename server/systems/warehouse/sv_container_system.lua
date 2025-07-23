@@ -429,7 +429,7 @@ function CheckQualityAlerts(playerId, container)
             containerId = container.id,
             type = "quality",
             severity = qualityStatus.name == "Damaged" and "critical" or "major",
-            message = string.format("Container quality is %s (%d%%)", qualityStatus.name, container.quality)
+            message = string.format("Container quality is %s (%d%%)", qualityStatus.name, math.floor(container.quality or 100))
         })
     end
 end

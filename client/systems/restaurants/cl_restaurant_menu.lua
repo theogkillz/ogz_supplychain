@@ -90,7 +90,13 @@ AddEventHandler("SupplyChain:Client:CreateOrderMenu", function(data)
                             Restaurant.AddToOrder(item, amount, itemLabel)
                             
                             -- Re-open menu
-                            TriggerEvent("SupplyChain:Client:CreateOrderMenu", data)
+                            TriggerEvent("SupplyChain:Client:OpenRestaurantMenu", {
+                                restaurantId = data.restaurantId,
+                                restaurant = data.restaurant,
+                                warehouseStock = warehouseStock,
+                                dynamicPrices = dynamicPrices,
+                                clearCart = true
+                            })
                         end
                     end
                 })

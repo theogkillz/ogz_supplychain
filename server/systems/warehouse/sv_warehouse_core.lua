@@ -389,7 +389,7 @@ AddEventHandler("SupplyChain:Server:RequestContainerOrders", function()
     
     -- Verify warehouse worker
     local playerJob = Framework.GetJob(player)
-    if playerJob ~= Config.Warehouse.warehouseJob then
+    if playerJob ~= Config.Warehouse.jobAccess then
         Framework.Notify(source, "You must be a warehouse worker", "error")
         return
     end
@@ -460,7 +460,7 @@ AddEventHandler("SupplyChain:Server:AcceptMultipleOrders", function(consolidated
     
     -- Verify warehouse worker
     local playerJob = Framework.GetJob(player)
-    if playerJob ~= Config.Warehouse.warehouseJob then
+    if playerJob ~= Config.Warehouse.jobAccess then
         Framework.Notify(source, "You must be a warehouse worker", "error")
         return
     end
@@ -677,7 +677,7 @@ RegisterCommand("sc_warehousestats", function(source, args)
         if not player then return end
         
         local playerJob = Framework.GetJob(player)
-        if playerJob ~= Config.Warehouse.warehouseJob and not Framework.HasPermission(player, "admin") then
+        if playerJob ~= Config.Warehouse.jobAccess and not Framework.HasPermission(player, "admin") then
             Framework.Notify(source, "You must be a warehouse worker to use this command", "error")
             return
         end

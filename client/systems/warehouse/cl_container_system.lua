@@ -59,7 +59,7 @@ function OpenRentalDurationMenu(containerType, config)
     local options = {
         {
             title = "2 Hours",
-            description = string.format("Cost: $%d + $%d deposit", hourly<rate * 2, config.deposit),
+            description = string.format("Cost: $%d + $%d deposit", hourlyRate * 2, config.deposit),
             icon = "fas fa-clock",
             onSelect = function()
                 ConfirmRental(containerType, 2)

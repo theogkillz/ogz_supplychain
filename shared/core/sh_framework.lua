@@ -185,33 +185,24 @@ function SupplyChain.Framework.Notify(source, message, type, duration)
     if isServer then
         TriggerClientEvent('SupplyChain:Client:Notify', source, message, type, duration)
     else
-        -- Client-side notification
-        if Config.UI.useLationUI and GetResourceState('lation_ui') == 'started' then
-            exports['lation_ui']:Notify({
-                title = 'Supply Chain',
-                message = message,
-                type = type or 'info',
-                duration = duration or 5000
-            })
-        else
-            lib.notify({
-                title = 'Supply Chain',
-                description = message,
-                type = type or 'info',
-                duration = duration or 5000,
-                position = Config.UI.notificationPosition,
-                style = {
-                    backgroundColor = '#141517',
-                    color = '#C1C2C5',
-                    ['.description'] = {
-                        color = '#909296'
-                    }
-                },
-                icon = 'box',
-                iconColor = type == 'error' and '#C53030' or 
-                           type == 'success' and '#2F8B26' or '#3B82F6'
-            })
-        end
+        -- Client-side notification - ox_lib will automatically use lation_ui if available
+        lib.notify({
+            title = 'Supply Chain',
+            description = message,
+            type = type or 'info',
+            duration = duration or 5000,
+            position = Config.UI.notificationPosition or 'center-right',
+            style = Config.UI.theme == 'dark' and {
+                backgroundColor = '#141517',
+                color = '#C1C2C5',
+                ['.description'] = {
+                    color = '#909296'
+                }
+            } or nil,
+            icon = 'box',
+            iconColor = type == 'error' and '#C53030' or 
+                       type == 'success' and '#2F8B26' or '#3B82F6'
+        })
     end
 end
 
