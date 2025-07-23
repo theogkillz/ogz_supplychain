@@ -25,8 +25,27 @@ CreateThread(function()
                         label = "Order Ingredients",
                         groups = restaurant.job,
                         onSelect = function()
-                            TriggerEvent("SupplyChain:Client:OpenOrderMenu", {
-                                restaurantId = restaurantId
+                            -- Get warehouse stock and prices
+                            local warehouseStock = StateManager and StateManager.GetWarehouseStock() or {}
+                            local dynamicPrices = {}
+                            
+                            -- Try to get dynamic prices if market system is enabled
+                            if Config.DynamicMarket and Config.DynamicMarket.enabled then
+                                local success, prices = pcall(function()
+                                    return exports['ogz_supplychain']:GetDynamicPrices()
+                                end)
+                                if success then
+                                    dynamicPrices = prices or {}
+                                end
+                            end
+                            
+                            -- Trigger the new shopping cart menu
+                            TriggerEvent("SupplyChain:Client:OpenRestaurantMenu", {
+                                restaurantId = restaurantId,
+                                restaurant = restaurant,
+                                warehouseStock = warehouseStock,
+                                dynamicPrices = dynamicPrices,
+                                clearCart = true
                             })
                         end
                     },

@@ -1,5 +1,32 @@
 QBCore = exports['qb-core']:GetCoreObject()
 
+if not Config.Location and Config.Seller then
+    Config.Location = Config.Seller.location
+end
+
+if not Config.SellerBlip and Config.Seller then
+    Config.SellerBlip = {
+        blipSprite = Config.Seller.blip.sprite,
+        blipScale = Config.Seller.blip.scale,
+        blipColor = Config.Seller.blip.color,
+        label = Config.Seller.blip.label,
+        coords = Config.Seller.blip.coords
+    }
+end
+
+-- Fallback if neither exists
+Config.Location = Config.Location or {
+        coords = vector3(-86.59, 6494.08, 31.51),
+        heading = 221.43
+    }
+
+    Config.SellerBlip = Config.SellerBlip or {
+        blipSprite = 1,
+        blipScale = 0.6,
+        blipColor = 1,
+        label = "Distributor",
+        coords = vector3(-88.4297, 6493.5161, 30.1007)
+    }
 Citizen.CreateThread(function()
     if not Config.Location or not Config.SellerBlip then
         print("[ERROR] Config.Location or Config.SellerBlip not defined in cl_seller.lua")
